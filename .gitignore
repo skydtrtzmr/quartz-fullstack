@@ -1,0 +1,7 @@
+# Input and output directories (contents only, keep the dirs)
+input/*
+output/*
+
+# Keep the directories themselves
+!input/.gitkeep
+!output/.gitkeep
