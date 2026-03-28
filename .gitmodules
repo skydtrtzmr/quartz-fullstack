@@ -1,0 +1,8 @@
+[submodule "client"]
+	path = client
+	url = https://github.com/skydtrtzmr/quartz.git
+	branch = dev
+[submodule "server"]
+	path = server
+	url = https://github.com/skydtrtzmr/go-quartz-api-server.git
+	branch = dev
