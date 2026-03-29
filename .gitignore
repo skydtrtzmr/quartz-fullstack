@@ -5,3 +5,4 @@ output/*
 # Keep the directories themselves
 !input/.gitkeep
 !output/.gitkeep
+/settings
