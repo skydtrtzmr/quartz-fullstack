@@ -1,46 +1,37 @@
-现有bug：
+# 待办事项
 
-1. 目录不支持子域名
-2. 新增了页面，图谱没有重绘。
+## 🐛 已知问题
 
-### 后端效果参考：
+1. [ ] **新增页面图谱未重绘** - 构建后图谱缓存未更新，新增节点/边不显示
+   - 优先级：高
+   - 可能原因：`.quartz-cache.db` 未正确更新
+   - 临时方案：构建时删除缓存文件
 
-构建命令：
-```
-npx quartz build -d E:\ProgramProjects\VScode_projects\quartz-fullstack\input\xm -o E:\ProgramProjects\VScode_projects\quartz-fullstack\output\xm
-```
+## ✅ 最近完成
 
-nginx配置：
+- [x] 目录支持子域名 - 通过 `/{domain}/` URL 路由已解决
+- [x] 业务域管理 API 完整实现
+- [x] 静态文件服务支持多 domain
+- [x] 配置自动生成与同步
 
-```
-worker_processes 1;
+## 📋 接下来做什么？
 
-events {
-    worker_connections 1024;
-}
+根据当前状态，建议优先级如下：
 
-http {
-    include mime.types;
-    default_type application/octet-stream;
-    sendfile on;
-    keepalive_timeout 65;
+### 方案 A：先解决图谱缓存问题（推荐）
+- 影响用户基础体验，新增内容不可见是严重问题
+- 工作量相对较小，改动局限于后端构建流程
+- 为后续图谱功能开发打好基础
 
-    # 这里才是放 server 的地方
-    server {
-        listen 8767;
-        server_name localhost;
+### 方案 B：先开发图谱前端功能
+- 边显示优化、聚合节点等是核心功能需求
+- 需要前后端配合，工作量较大
+- 但如果缓存问题不解决，新增内容测试困难
 
-        # 注意 Windows 路径建议用正斜杠 /，且用引号包裹
-        root "E:/ProgramProjects/VScode_projects/quartz-fullstack/output";
+### 方案 C：完善 Domain 管理
+- 删除 API、构建状态查询等
+- 工作量小，但优先级相对较低
 
-        index index.html;
+---
 
-        location /xm/ {
-            try_files $uri $uri/ $uri.html =404;
-        }
-
-        error_page 404 /404.html;
-    }
-
-} # 确保这个是 http 块的右花括号
-```
+**推荐：先处理方案 A（图谱缓存问题），再推进方案 B（图谱功能）**

@@ -1,4 +1,26 @@
 # Quartz 后端研发任务清单
 
-- [ ] Quartz服务器-业务域区分：根据一级文件夹区分不同业务域的MD文件，分别进行图谱/目录构建（以及应用配置），浏览时通过URL路由/参数区分业务域。
-- [ ] Quartz服务器-业务域配置API：新增API，用于接收U3的一级目录配置请求和映射配置聚合字段设置请求，触发相关组件的重新构建（区分于原有API的页面增量构建）。
+## ✅ 已完成
+
+- [x] **业务域区分**：基于 `settings/{domain}/` 目录作为 domain 权威来源，分别进行图谱/目录构建
+- [x] **业务域配置 API**：
+  - `GET /api/domain` - 列出所有 domain
+  - `POST /api/domain/create` - 创建 domain
+  - `PUT /api/domain/{domain}/config` - 更新 domain 配置
+  - `POST /api/domain/{domain}/build` - 触发指定 domain 的构建
+  - `GET /api/domain/{domain}/config` - 获取 domain 配置
+
+## 🔄 进行中/待优化
+
+- [ ] **构建缓存优化**：新增页面后图谱没有自动重绘问题
+  - 问题：Quartz 增量构建时缓存未正确更新
+  - 可能方案：构建前清理 `.quartz-cache.db` 或调整缓存策略
+  
+- [ ] **多进程构建支持**：多个 domain 同时构建时的并发控制
+
+## 📋 待开发
+
+- [ ] **构建状态 API**：`GET /api/domain/{domain}/status` 查询构建状态
+- [ ] **构建日志 API**：`GET /api/domain/{domain}/logs` 获取构建日志
+- [ ] **Domain 删除 API**：`DELETE /api/domain/{domain}`
+- [ ] **配置验证 API**：创建/更新配置时的合法性检查
