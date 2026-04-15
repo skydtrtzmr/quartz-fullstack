@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --prefix \"E:/ProgramProjects/VScode_projects/quartz-fullstack/client\" run check)"
+    ]
+  }
+}
