@@ -101,40 +101,28 @@ type DomainTaskManager struct {
 
 ## 📋 API 接口文档
 
+> 完整的 API 文档请参考 `API文档.md`。
+
 ### 业务域管理
 
-#### 创建业务域
-```
-POST /api/domain/create?u={user}&p={pwd}
-Content-Type: application/json
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/domain` | 列出所有业务域 |
+| POST | `/api/domain/create` | 创建业务域 |
+| GET | `/api/domain/{domain}` | 获取业务域信息 |
+| PUT | `/api/domain/{domain}` | 更新业务域配置（config + layout） |
+| DELETE | `/api/domain/{domain}` | 删除业务域 |
+| POST | `/api/domain/{domain}/build` | 触发构建 |
+| GET | `/api/domain/{domain}/status` | 获取构建状态 |
+| GET | `/api/domain/{domain}/logs` | 获取构建日志 |
+| GET | `/api/domain/tasks` | 获取所有运行中的任务 |
 
-{
-  "domain_name": "xm"
-}
+### 配置说明
 
-Response:
-{"status": "Created", "domain": "xm", "message": "Domain created successfully"}
-```
+**注意**：`baseUrl` 由服务器自动生成，公式为 `{server config.json base_url}/{domain}`，用户传入的值会被忽略。
 
-#### 获取业务域信息
-```
-GET /api/domain/{domain}?u={user}&p={pwd}
-
-Response:
-{
-  "domain_id": "xm",
-  "display_name": "xm",
-  "base_url": "http://127.0.0.1:8766/xm",
-  "config": { ... },
-  "layout": { ... }
-}
-```
-
-#### 更新业务域配置
-```
-PUT /api/domain/{domain}?u={user}&p={pwd}
-Content-Type: application/json
-
+**API 请求格式**（更新业务域配置）：
+```json
 {
   "config": {
     "pageTitle": "新标题",
@@ -142,93 +130,13 @@ Content-Type: application/json
   },
   "layout": {
     "backlinks": {
-      "hideWhenEmpty": true,
       "aggregation": {
         "folder": { "depth": 2, "flatten": true },
-        "fields": [
-          { "field": "date", "granularity": "year", "order": 1 },
-          { "field": "tags", "order": 2 }
-        ]
+        "fields": [{ "field": "date", "granularity": "year", "order": 1 }]
       }
     }
   }
 }
-
-Response:
-{"status": "Saved", "domain": "xm"}
-```
-
-**注意**：
-- `config` 和 `layout` 都是可选的，只传一个就只更新那一个
-- `baseUrl` 由服务器自动生成，用户传入的值会被忽略
-
-#### 删除业务域
-```
-DELETE /api/domain/{domain}?u={user}&p={pwd}
-Content-Type: application/json
-
-{
-  "delete_input": false,   // 是否同时删除输入目录
-  "delete_output": false    // 是否同时删除输出目录
-}
-
-Response (成功):
-{"status": "Deleted", "domain": "xm", "message": "Domain deleted successfully", "deletedInput": false, "deletedOutput": true}
-
-Response (有任务运行中):
-{"status": "Busy", "message": "Cannot delete domain 'xm': task is running", "taskId": "xm-20260413-143000"}
-```
-
-### 构建管理
-
-#### 触发构建
-```
-POST /api/domain/{domain}/build?u={user}&p={pwd}&reset=true
-
-Response:
-{"status": "Accepted", "taskId": "xm-20260413-143000", "message": "Build triggered for domain: xm", "command": "..."}
-
-Response (有任务运行中):
-{"status": "Busy", "message": "A task is running for domain 'xm'", "taskId": "xm-20260413-142500", "description": "该域名的任务正在执行，请稍后再试"}
-```
-
-#### 获取构建状态
-```
-GET /api/domain/{domain}/status?u={user}&p={pwd}
-
-Response (空闲):
-{"domain": "xm", "status": "idle", "running": false}
-
-Response (运行中):
-{
-  "domain": "xm",
-  "status": "running",
-  "running": true,
-  "taskId": "xm-20260413-143000",
-  "startTime": "2026-04-13 14:30:00",
-  "duration": "5s",
-  "reset": true,
-  "command": "npx quartz build ...",
-  "logPath": "logs/tasks/task-xm-20260413-143000.log"
-}
-```
-
-#### 获取构建日志
-```
-GET /api/domain/{domain}/logs?u={user}&p={pwd}
-
-Response: 纯文本日志内容
-```
-
-#### 获取所有运行中的任务
-```
-GET /api/domain/tasks?u={user}&p={pwd}
-
-Response:
-{"runningCount": 2, "tasks": [
-  {"domain": "xm", "taskId": "xm-20260413-143000", "startTime": "2026-04-13 14:30:00", "duration": "5s", "reset": true},
-  {"domain": "xm1", "taskId": "xm1-20260413-143015", "startTime": "2026-04-13 14:30:15", "duration": "3s", "reset": false}
-]}
 ```
 
 ---
