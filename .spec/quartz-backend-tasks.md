@@ -5,13 +5,13 @@
 ### 业务域核心功能
 - [x] **业务域区分**：基于 `settings/{domain}/` 目录作为 domain 权威来源，分别进行图谱/目录构建
   - 实现位置：`server/domain_config.go`（DomainManager 结构体）
-  - 目录结构：`settings/{domain}/domain_config.json`
+  - 目录结构：`settings/{domain}/quartz.config.json` + `quartz.layout.json`
 
 - [x] **业务域配置 API**：
   - `GET /api/domain` - 列出所有 domain
   - `POST /api/domain/create` - 创建 domain（同时创建目录和默认 index.md）
-  - `PUT /api/domain/{domain}/config` - 更新 domain 配置
-  - `GET /api/domain/{domain}/config` - 获取 domain 配置
+  - `PUT /api/domain/{domain}` - 更新 domain 配置（config + layout）
+  - `GET /api/domain/{domain}` - 获取 domain 信息
   - `DELETE /api/domain/{domain}` - 删除业务域（配置目录 + 可选输入/输出目录）
   - `POST /api/domain/{domain}/build` - 触发指定 domain 的构建
   - 实现位置：`server/domain_config.go`（HTTP Handlers）+ `server/api.go`
@@ -22,28 +22,47 @@
   - `GET /api/domain/tasks` - 获取所有正在运行的任务
   - 实现位置：`server/domain_config.go`
 
+- [x] **baseUrl 自动生成**：
+  - 根据 `server/config.json` 的 `base_url` + domain 自动拼接
+  - 用户在 API 请求中传入的 `baseUrl` 会被忽略
+  - 实现位置：`server/domain_config.go`（generateBaseUrl 函数）
+
 ### 业务域配置结构
 ```go
-type DomainConfig struct {
-    DomainName       string                  // 业务域名称
-    DisplayName      string                  // 显示名称
-    Description      string                  // 描述
-    RootFolders      []RootFolderConfig      // 一级目录配置
-    AggregationFields AggregationConfig       // 聚合字段映射
-    BuildOverrides   BuildConfig             // 构建配置覆盖
+type QuartzConfig struct {
+    BaseUrl   string         // 由服务器自动生成
+    PageTitle string         // 显示名称（用户可设置）
+    Graph     GraphConfig    // 图谱配置
+}
+
+type QuartzLayout struct {
+    Backlinks    BacklinksConfig    // 反向链接配置
+}
+
+type GraphConfig struct {
+    Tags      TagConfig
+    Category  TagConfig
+}
+
+type TagConfig struct {
+    Color       string
+    DisplayName string
+}
+
+type BacklinksConfig struct {
+    HideWhenEmpty bool
+    Aggregation   AggregationConfig
 }
 
 type AggregationConfig struct {
-    GraphFields    []GraphFieldMapping      // 图谱字段映射
-    ExplorerFields []ExplorerFieldMapping    // 目录字段映射
+    Folder  FolderConfig
+    Fields  []FieldConfig
 }
 
-type BuildConfig struct {
-    BaseUrl         string   // 覆盖 baseUrl
-    Theme           string   // 主题设置
-    EnableGraph     *bool    // 是否启用图谱
-    EnableExplorer  *bool    // 是否启用目录
-    EnableSearch    *bool    // 是否启用搜索
+type FieldConfig struct {
+    Field      string
+    Granularity string  // "year", "month", "quarter", 或 ""
+    Order      int
 }
 ```
 
@@ -90,40 +109,58 @@ POST /api/domain/create?u={user}&p={pwd}
 Content-Type: application/json
 
 {
-  "domain_name": "xm",
-  "display_name": "项目X",
-  "description": "项目X的知识库"
+  "domain_name": "xm"
 }
 
 Response:
 {"status": "Created", "domain": "xm", "message": "Domain created successfully"}
 ```
 
-#### 获取业务域配置
+#### 获取业务域信息
 ```
-GET /api/domain/{domain}/config?u={user}&p={pwd}
+GET /api/domain/{domain}?u={user}&p={pwd}
 
 Response:
 {
-  "domain_name": "xm",
-  "display_name": "项目X",
-  ...
+  "domain_id": "xm",
+  "display_name": "xm",
+  "base_url": "http://127.0.0.1:8766/xm",
+  "config": { ... },
+  "layout": { ... }
 }
 ```
 
 #### 更新业务域配置
 ```
-PUT /api/domain/{domain}/config?u={user}&p={pwd}
+PUT /api/domain/{domain}?u={user}&p={pwd}
 Content-Type: application/json
 
 {
-  "display_name": "项目X(更新)",
-  "description": "更新后的描述"
+  "config": {
+    "pageTitle": "新标题",
+    "graph": { "tags": { "color": "#ff0000", "displayName": "标签" } }
+  },
+  "layout": {
+    "backlinks": {
+      "hideWhenEmpty": true,
+      "aggregation": {
+        "folder": { "depth": 2, "flatten": true },
+        "fields": [
+          { "field": "date", "granularity": "year", "order": 1 },
+          { "field": "tags", "order": 2 }
+        ]
+      }
+    }
+  }
 }
 
 Response:
 {"status": "Saved", "domain": "xm"}
 ```
+
+**注意**：
+- `config` 和 `layout` 都是可选的，只传一个就只更新那一个
+- `baseUrl` 由服务器自动生成，用户传入的值会被忽略
 
 #### 删除业务域
 ```
@@ -132,7 +169,7 @@ Content-Type: application/json
 
 {
   "delete_input": false,   // 是否同时删除输入目录
-  "delete_output": false   // 是否同时删除输出目录
+  "delete_output": false    // 是否同时删除输出目录
 }
 
 Response (成功):
@@ -242,9 +279,10 @@ Response:
 ```json
 {
   "port": 8766,
+  "base_url": "http://127.0.0.1:8766",
   "input_dir": "e:/ProgramProjects/VScode_projects/quartz-fullstack/input",
   "output_dir": "e:/ProgramProjects/VScode_projects/quartz-fullstack/output",
-  "settings_dir": "e:/ProgramProjects/VScode_projects/quartz-fullstack/client/quartz.config.d",
+  "settings_dir": "e:/ProgramProjects/VScode_projects/quartz-fullstack/settings",
   "auth": {
     "user": "admin",
     "pwd": "admin",
@@ -262,6 +300,35 @@ Response:
 }
 ```
 
+`settings/{domain}/quartz.config.json`:
+```json
+{
+  "pageTitle": "源悦知识库",
+  "graph": {
+    "tags": {
+      "color": "#4a9eff",
+      "displayName": "标签"
+    }
+  }
+}
+```
+
+`settings/{domain}/quartz.layout.json`:
+```json
+{
+  "backlinks": {
+    "hideWhenEmpty": false,
+    "aggregation": {
+      "folder": {
+        "depth": 1,
+        "flatten": true
+      },
+      "fields": []
+    }
+  }
+}
+```
+
 ---
 
 ## 📝 开发注意事项
@@ -271,3 +338,4 @@ Response:
 3. **日志规范**：使用 `log.Printf` 输出到标准日志
 4. **错误处理**：返回结构化 JSON 错误信息，便于前端解析
 5. **构建并行**：不同 domain 可并行构建，同一 domain 必须串行
+6. **baseUrl 规则**：`baseUrl` 由服务器自动生成，用户不可自定义

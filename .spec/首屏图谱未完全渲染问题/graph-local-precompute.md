@@ -140,7 +140,7 @@ if (precomputed) {
 
 2. **✅ 新增配置选项** - quartz.config.ts 支持 precomputeLocal
    - cfg.ts 中已添加 GraphConfig 接口
-   - domain_config.go 中 generateQuartzConfig 会传递配置
+   - Server 在保存 quartz.config.json 时会包含 graph 配置
 
 3. **✅ 修改 graph2.inline.ts** - 优先加载预计算数据，支持 fallback
    - 已实现预计算数据加载逻辑

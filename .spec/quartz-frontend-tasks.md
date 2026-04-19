@@ -56,7 +56,7 @@
 
 - [x] **反向链接聚合分组**：
   - [x] 支持多级聚合：文件夹 + 多个 frontmatter 字段
-  - [x] 配置文件：`settings/{domain}/layout.json` 的 `aggregation.backlinks` 节点
+  - [x] 配置文件：`settings/{domain}/quartz.layout.json` 的 `aggregation.backlinks` 节点
   - [x] 文件夹配置：
     - `folder.depth`: -1=完整层级, 0=禁用, 默认1
     - `folder.flatten`: true=扁平化, false=保留层级，默认true
@@ -124,18 +124,18 @@ const defaultOptions: BacklinksOptions = {
 ```
 
 ### 局部图谱预计算配置
-**文件**：`quartz.config.ts` 或 domain 的 `config.json`
+**文件**：`quartz.config.ts` 或 domain 的 `quartz.config.json`
 
 ```ts
 graph: {
   precomputeLocal: true,  // 启用局部图谱预计算
   localDepth: 1,          // 预计算深度，默认 1
-  fallbackToBfs: true,   // 当预计算数据不可用时回退到 BFS
+  fallbackToBfs: true,    // 当预计算数据不可用时回退到 BFS
 }
 ```
 
 ### 反向链接聚合配置
-**文件**：`settings/{domain}/layout.json`
+**文件**：`settings/{domain}/quartz.layout.json`
 
 ```json
 {
@@ -193,7 +193,7 @@ graph: {
   - 按指定聚合字段（属性、标签或日期范围）聚合同类节点
   - 显示每个聚合节点包含的子节点数量
   - 聚合节点可以展开
-  - 配置来源：`domain_config.json` 中的 `AggregationFields.GraphFields`
+  - 配置来源：`quartz.config.json` 中的 `graph` 配置
 
 ### 🟢 P2 - 目录与链接优化
 - [ ] **反向链接优化**

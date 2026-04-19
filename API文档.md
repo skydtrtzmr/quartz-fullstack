@@ -4,7 +4,7 @@
 
 本文档描述 Quartz 全栈项目的后端 API 接口，包括业务域管理、构建触发和静态文件服务。
 
-**基础 URL**: `http://127.0.0.1:8766`  
+**基础 URL**: `http://127.0.0.1:8766`
 **认证方式**: URL 查询参数 或 Cookie
 
 ---
@@ -34,7 +34,7 @@ GET /api/domain?user=admin&pwd=password123
 
 ## 业务域管理 API
 
-业务域（Domain）是 Quartz 的多租户隔离单位，如 `xm`、`xm1`、`xm2` 等。每个业务域有独立的：
+业务域（Domain）是 Quartz 的多租户隔离单位，如 `xm`、`xm1`、`testwork0` 等。每个业务域有独立的：
 - 输入目录：`input/{domain}/`
 - 输出目录：`output/{domain}/`
 - 配置目录：`settings/{domain}/`
@@ -53,8 +53,27 @@ curl "http://127.0.0.1:8766/api/domain?user=admin&pwd=password123"
 **响应**：
 ```json
 {
-  "domains": ["xm", "xm1", "xm2"],
-  "count": 3
+  "count": 2,
+  "domains": [
+    {
+      "domain_name": "xm",
+      "display_name": "源悦知识库",
+      "config": {
+        "baseUrl": "127.0.0.1:8767/xm",
+        "pageTitle": "源悦知识库",
+        "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
+      },
+      "layout": {
+        "backlinks": { "hideWhenEmpty": false, "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [] } }
+      }
+    },
+    {
+      "domain_name": "testwork0",
+      "display_name": "testwork0",
+      "config": { ... },
+      "layout": { ... }
+    }
+  ]
 }
 ```
 
@@ -70,8 +89,7 @@ POST /api/domain/create
 ```json
 {
   "domain_name": "xm1",
-  "display_name": "业务域1",
-  "description": "这是第一个测试业务域"
+  "display_name": "业务域1"
 }
 ```
 
@@ -79,7 +97,7 @@ POST /api/domain/create
 ```bash
 curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"domain_name": "xm1", "display_name": "业务域1", "description": "测试业务域"}'
+  -d '{"domain_name": "xm1", "display_name": "业务域1"}'
 ```
 
 **响应**：
@@ -93,48 +111,33 @@ curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123
 
 **说明**：
 - 自动创建 `input/xm1/` 和 `settings/xm1/` 目录
-- 自动生成默认的 `domain_config.json` 和 `index.md`
+- 自动生成默认的 `quartz.config.json`、`quartz.layout.json` 和 `index.md`
 
 ---
 
-### 3. 获取业务域配置
+### 3. 获取业务域信息
 
 ```
-GET /api/domain/{domain}/config
+GET /api/domain/{domain}
 ```
 
 **请求示例**：
 ```bash
-curl "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password123"
+curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
 ```
 
 **响应**：
 ```json
 {
   "domain_name": "xm",
-  "display_name": "xm",
-  "description": "",
-  "root_folders": [],
-  "aggregation_fields": {
-    "graph_fields": [
-      {
-        "field_name": "tags",
-        "display_name": "标签",
-        "color": "#4a9eff",
-        "enabled": true
-      }
-    ],
-    "explorer_fields": [
-      {
-        "field_name": "folder",
-        "display_name": "文件夹",
-        "group_by": true,
-        "sort_order": 1
-      }
-    ]
+  "display_name": "源悦知识库",
+  "config": {
+    "baseUrl": "127.0.0.1:8767/xm",
+    "pageTitle": "源悦知识库",
+    "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
   },
-  "build_overrides": {
-    "base_url": "127.0.0.1:8767/xm"
+  "layout": {
+    "backlinks": { "hideWhenEmpty": false, "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [] } }
   }
 }
 ```
@@ -144,64 +147,51 @@ curl "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password123"
 ### 4. 更新业务域配置
 
 ```
-PUT /api/domain/{domain}/config
-POST /api/domain/{domain}/config
+PUT /api/domain/{domain}
+POST /api/domain/{domain}
 ```
 
-**请求体**：
+**请求体**（`config` 和 `layout` 都是可选的）：
 ```json
 {
-  "domain_name": "xm",
-  "display_name": "主业务域",
-  "description": "核心业务知识库",
-  "root_folders": [
-    {
-      "name": "项目文档",
-      "display_name": "项目文档",
-      "description": "项目相关文档",
-      "icon": "📁",
-      "order": 1,
-      "visible": true
+  "config": {
+    "baseUrl": "127.0.0.1:8767/xm",
+    "pageTitle": "新标题",
+    "graph": {
+      "tags": {
+        "color": "#ff0000",
+        "displayName": "标签"
+      }
     }
-  ],
-  "aggregation_fields": {
-    "graph_fields": [
-      {
-        "field_name": "tags",
-        "display_name": "标签",
-        "color": "#4a9eff",
-        "enabled": true
-      },
-      {
-        "field_name": "category",
-        "display_name": "分类",
-        "color": "#ff6b6b",
-        "enabled": true
-      }
-    ],
-    "explorer_fields": [
-      {
-        "field_name": "folder",
-        "display_name": "文件夹",
-        "group_by": true,
-        "sort_order": 1
-      }
-    ]
   },
-  "build_overrides": {
-    "base_url": "127.0.0.1:8767/xm",
-    "enable_graph": true,
-    "enable_explorer": true,
-    "enable_search": true
+  "layout": {
+    "backlinks": {
+      "hideWhenEmpty": false,
+      "aggregation": {
+        "folder": {
+          "depth": 2,
+          "flatten": true
+        },
+        "fields": [
+          { "field": "date", "granularity": "year", "order": 1 }
+        ]
+      }
+    }
   }
 }
 ```
 
 **请求示例**：
 ```bash
-curl -X PUT "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password123" \
+# 只更新 pageTitle
+curl -X PUT "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"domain_name": "xm", "display_name": "主业务域", ...}'
+  -d '{"config": {"pageTitle": "新标题"}}'
+
+# 只更新 layout
+curl -X PUT "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" \
+  -H "Content-Type: application/json" \
+  -d '{"layout": {"backlinks": {"hideWhenEmpty": true}}}'
 ```
 
 **响应**：
@@ -214,32 +204,47 @@ curl -X PUT "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password1
 
 ---
 
-### 5. 删除业务域配置
+### 5. 删除业务域
 
 ```
-DELETE /api/domain/{domain}/config
+DELETE /api/domain/{domain}
+```
+
+**请求体**（可选）：
+```json
+{
+  "delete_input": true,
+  "delete_output": true
+}
 ```
 
 **请求示例**：
 ```bash
-curl -X DELETE "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password123"
+# 只删除配置目录
+curl -X DELETE "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
+
+# 删除配置 + 输入 + 输出目录
+curl -X DELETE "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" \
+  -H "Content-Type: application/json" \
+  -d '{"delete_input": true, "delete_output": true}'
 ```
 
 **响应**：
 ```json
 {
   "status": "Deleted",
-  "domain": "xm"
+  "domain": "xm",
+  "message": "Domain deleted successfully",
+  "deletedInput": true,
+  "deletedOutput": false
 }
 ```
-
-**注意**：此操作仅删除配置文件，不会删除输入目录和输出目录。
 
 ---
 
 ## 构建 API
 
-### 1. 触发指定业务域构建（推荐）
+### 1. 触发指定业务域构建
 
 ```
 POST /api/domain/{domain}/build
@@ -254,22 +259,70 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm/build?user=admin&pwd=password1
 ```json
 {
   "status": "Accepted",
-  "message": "Build triggered for domain: xm"
+  "message": "Build triggered for domain: xm",
+  "command": "node build --settings=settings/xm -d input/xm -o output/xm"
 }
 ```
 
 **构建流程**：
-1. 加载业务域配置 `settings/{domain}/domain_config.json`
-2. 应用配置生成 Quartz 配置文件 `settings/{domain}/config.json`
-3. 执行构建命令：
-   ```
-   node ./quartz/bootstrap-cli.mjs build --sqlite --settings={settingsDir}/{domain} -d {inputDir}/{domain} -o {outputDir}/{domain}
-   ```
-4. 构建日志保存到 `logs/tasks/task-{timestamp}.log`
+1. 检查业务域目录是否存在
+2. 执行构建命令：`node ./quartz/bootstrap-cli.mjs build --sqlite --settings={settingsDir}/{domain} -d {inputDir}/{domain} -o {outputDir}/{domain}`
+3. 构建日志保存到 `logs/tasks/task-{timestamp}.log`
+
+**带 reset 模式**：
+```bash
+curl -X POST "http://127.0.0.1:8766/api/domain/xm/build?user=admin&pwd=password123&reset=true"
+```
 
 ---
 
-### 2. 传统构建端点（兼容）
+### 2. 获取构建状态
+
+```
+GET /api/domain/{domain}/status
+```
+
+**请求示例**：
+```bash
+curl "http://127.0.0.1:8766/api/domain/xm/status?user=admin&pwd=password123"
+```
+
+**响应**（运行中）：
+```json
+{
+  "status": "running",
+  "domain": "xm",
+  "taskId": "xm-1745067600",
+  "startTime": "2026-04-19T15:00:00Z"
+}
+```
+
+**响应**（空闲）：
+```json
+{
+  "status": "idle",
+  "domain": "xm"
+}
+```
+
+---
+
+### 3. 获取构建日志
+
+```
+GET /api/domain/{domain}/logs
+```
+
+**请求示例**：
+```bash
+curl "http://127.0.0.1:8766/api/domain/xm/logs?user=admin&pwd=password123"
+```
+
+**响应**：`text/plain` 格式的日志内容
+
+---
+
+### 4. 传统构建端点（兼容）
 
 ```
 POST /api/build
@@ -293,21 +346,6 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 ---
 
-### 构建任务状态
-
-构建任务异步执行，同一时间只能有一个任务在运行。
-
-**忙碌响应**：
-```json
-{
-  "status": "Busy",
-  "message": "A task is running",
-  "description": "已有任务正在执行，请稍后再试"
-}
-```
-
----
-
 ## 静态文件服务
 
 静态文件服务支持多业务域隔离，URL 路径格式为 `/{domain}/{path}`。
@@ -325,96 +363,58 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 > **重要**：访问业务域时必须带斜杠（`/xm/`），否则后端会返回 301 重定向到 `/xm/`。这是为了确保前端相对路径（如 `./static/contentIndex.json`）能正确解析到 `/xm/static/contentIndex.json`。
 
-### Nginx 配置参考
-
-```nginx
-server {
-    listen 8767;
-    server_name localhost;
-    root "E:/ProgramProjects/VScode_projects/quartz-fullstack/output";
-    index index.html;
-
-    # 业务域 xm
-    location /xm/ {
-        try_files $uri $uri/ $uri.html =404;
-    }
-    
-    # 业务域 xm1
-    location /xm1/ {
-        try_files $uri $uri/ $uri.html =404;
-    }
-
-    error_page 404 /404.html;
-}
-```
-
 ### 缓存控制
 
 - **HTML/JSON 文件**：`Cache-Control: no-store`（不缓存）
 - **静态资源**：`Cache-Control: public, max-age=31536000`（长期缓存）
 
-### 路径重定向规则
-
-后端会自动处理以下重定向：
-
-| 访问路径 | 响应 | 目标路径 |
-|---------|------|---------|
-| `/xm` | 301 Moved Permanently | `/xm/` |
-| `/xm/page` | 200 OK | `output/xm/page.html` |
-| `/static/...` | 404 Not Found | - |
-
-> **注意**：直接访问 `/static/contentIndex.json` 会返回 404，必须通过业务域路径访问，如 `/xm/static/contentIndex.json`。
-
 ---
 
 ## 配置数据结构
 
-### DomainConfig（业务域配置）
+### quartz.config.json
+
+**注意**：`baseUrl` 由服务器根据 `config.json` 的 `base_url` + domain 自动生成，API 请求中传入的值会被忽略。
+
+```json
+{
+  "pageTitle": "源悦知识库",
+  "graph": {
+    "tags": {
+      "color": "#4a9eff",
+      "displayName": "标签"
+    }
+  }
+}
+```
+
+### quartz.layout.json
+
+```json
+{
+  "backlinks": {
+    "hideWhenEmpty": false,
+    "aggregation": {
+      "folder": {
+        "depth": 1,
+        "flatten": true
+      },
+      "fields": [
+        { "field": "date", "granularity": "year", "order": 1 }
+      ]
+    }
+  }
+}
+```
+
+### DomainInfo（API 响应结构）
 
 ```typescript
-interface DomainConfig {
-  domain_name: string;        // 业务域标识（如 xm, xm1）
-  display_name: string;       // 显示名称
-  description: string;        // 描述
-  root_folders: RootFolderConfig[];    // 一级目录配置
-  aggregation_fields: AggregationConfig; // 聚合字段配置
-  build_overrides: BuildConfig;          // 构建设置覆盖
-}
-
-interface RootFolderConfig {
-  name: string;           // 目录名
-  display_name: string;   // 显示名
-  description: string;    // 描述
-  icon: string;           // 图标
-  order: number;          // 排序
-  visible: boolean;       // 是否可见
-}
-
-interface AggregationConfig {
-  graph_fields: GraphFieldMapping[];       // 图谱聚合字段
-  explorer_fields: ExplorerFieldMapping[]; // 目录聚合字段
-}
-
-interface GraphFieldMapping {
-  field_name: string;     // 字段名（如 tags, category）
-  display_name: string;   // 显示名
-  color: string;          // 颜色（十六进制）
-  enabled: boolean;       // 是否启用
-}
-
-interface ExplorerFieldMapping {
-  field_name: string;     // 字段名
-  display_name: string;   // 显示名
-  group_by: boolean;      // 是否按此分组
-  sort_order: number;     // 排序优先级
-}
-
-interface BuildConfig {
-  base_url?: string;      // 覆盖 baseUrl
-  theme?: string;         // 主题
-  enable_graph?: boolean;     // 启用图谱
-  enable_explorer?: boolean;  // 启用目录
-  enable_search?: boolean;    // 启用搜索
+interface DomainInfo {
+  domain_name: string;     // 业务域标识（目录名）
+  display_name: string;    // 显示名称（从 pageTitle 获取）
+  config: QuartzConfig;   // quartz.config.json 内容
+  layout: QuartzLayout;  // quartz.layout.json 内容
 }
 ```
 
@@ -426,19 +426,15 @@ interface BuildConfig {
 quartz-fullstack/
 ├── input/                    # Markdown 输入目录
 │   ├── xm/                   # xm 业务域输入
-│   ├── xm1/                  # xm1 业务域输入
-│   └── xm2/
+│   └── xm1/                  # xm1 业务域输入
 ├── output/                   # 构建输出目录
 │   ├── xm/                   # xm 业务域输出（对应 /xm/ URL）
-│   ├── xm1/                  # xm1 业务域输出（对应 /xm1/ URL）
-│   └── xm2/
+│   └── xm1/                  # xm1 业务域输出（对应 /xm1/ URL）
 ├── settings/                 # 配置目录
 │   ├── xm/                   # xm 业务域配置
-│   │   ├── domain_config.json   # 业务域配置（后端管理）
-│   │   ├── config.json          # Quartz 配置（自动生成）
-│   │   └── layout.json          # Quartz 布局配置
-│   ├── xm1/
-│   └── xm2/
+│   │   ├── quartz.config.json   # Quartz 配置
+│   │   └── quartz.layout.json    # Quartz 布局配置
+│   └── xm1/
 ├── server/                   # 后端服务代码
 │   ├── main.go
 │   ├── api.go
@@ -515,11 +511,7 @@ quartz-fullstack/
 ```bash
 curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{
-    "domain_name": "xm1",
-    "display_name": "业务域1",
-    "description": "第一个业务域"
-  }'
+  -d '{"domain_name": "xm1", "display_name": "业务域1"}'
 ```
 
 ### 2. 添加 Markdown 文件
@@ -529,15 +521,11 @@ curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123
 ### 3. 更新业务域配置（可选）
 
 ```bash
-curl -X PUT "http://127.0.0.1:8766/api/domain/xm1/config?user=admin&pwd=password123" \
+curl -X PUT "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
   -d '{
-    "domain_name": "xm1",
-    "display_name": "业务域1",
-    "build_overrides": {
-      "base_url": "127.0.0.1:8767/xm1",
-      "enable_graph": true
-    }
+    "config": {"pageTitle": "业务域1", "baseUrl": "127.0.0.1:8767/xm1"},
+    "layout": {"backlinks": {"hideWhenEmpty": false}}
   }'
 ```
 
@@ -553,5 +541,5 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1/build?user=admin&pwd=password
 
 ---
 
-**文档版本**: v1.0  
-**更新日期**: 2026-03-29
+**文档版本**: v2.0
+**更新日期**: 2026-04-19

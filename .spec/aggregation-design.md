@@ -4,6 +4,8 @@
 
 反向链接和图谱都支持聚合功能，将关联节点按指定维度分组显示，提升大规模节点的可浏览性。
 
+同时，Explorer2 文件浏览器和文件夹页支持排序配置。
+
 ### 聚合维度
 
 | 维度类型 | 说明 | 示例 |
@@ -20,7 +22,16 @@
 
 ---
 
-## 二、配置结构
+## 二、配置结构（v2：组件内聚设计）
+
+### 设计理念
+
+统一设计：**组件名作为第一级，aggregation 作为支持该功能的组件的属性**。
+
+优点：
+- 内聚性：组件的配置都在自己下面
+- 可发现性：查看某个组件的配置，很自然地就能看到它支持哪些属性
+- 可扩展性：添加新组件时，直接加字段即可
 
 ### TypeScript 类型定义
 
@@ -31,8 +42,8 @@ type Granularity = "year" | "month" | "quarter"
 
 // 文件夹聚合配置
 interface FolderAggregation {
-  type: "folder"
-  depth?: number       // 展开层级深度，默认不限
+  depth?: number       // 展开层级深度，-1=完整层级, 0=禁用, 默认1
+  flatten?: boolean    // true=扁平化, false=保留层级，默认true
 }
 
 // 字段聚合配置
@@ -43,33 +54,38 @@ interface FieldAggregation {
   order: number         // 排序优先级，值越小越先匹配
 }
 
-// 聚合规则联合类型
-type AggregationRule = FolderAggregation | FieldAggregation
+// ===== 完整 LayoutConfig 结构 =====
 
-// ===== 完整配置结构 =====
-
-interface AggregationConfig {
-  // 反向链接聚合
-  backlinks?: {
-    // 文件夹聚合（唯一，必须是第一级）
-    folder?: {
-      depth?: number
-    }
-    // 字段聚合列表（按 order 升序排列）
-    fields?: FieldAggregation[]
+interface LayoutConfig {
+  // Explorer2 文件浏览器
+  explorer?: {
+    aggregation?: AggregationConfig
+    // 排序配置（预留）
   }
 
-  // 图谱聚合
+  // 反向链接
+  backlinks?: {
+    hideWhenEmpty?: boolean
+    aggregation?: AggregationConfig
+  }
+
+  // 文件夹页（tag、folder 列表页）
+  folderPage?: {
+    aggregation?: AggregationConfig
+    // 排序配置（预留）
+  }
+
+  // 图谱
   graph?: {
-    // 文件夹聚合（唯一）
-    folder?: {
-      depth?: number
-    }
-    // 字段聚合列表（按 order 升序排列）
-    fields?: FieldAggregation[]
-    // 着色字段（用于节点颜色区分）
+    aggregation?: AggregationConfig
     colorBy?: string
   }
+}
+
+// 聚合配置（可复用于多个组件）
+interface AggregationConfig {
+  folder?: FolderAggregation
+  fields?: FieldAggregation[]
 }
 ```
 
@@ -77,21 +93,36 @@ interface AggregationConfig {
 
 ```json
 {
-  "aggregation": {
-    "backlinks": {
-      "folder": { "depth": 2 },
+  "explorer": {
+    "aggregation": {
+      "folder": { "depth": 1, "flatten": false }
+    }
+  },
+  "backlinks": {
+    "hideWhenEmpty": false,
+    "aggregation": {
+      "folder": { "depth": 2, "flatten": false },
       "fields": [
-        { "field": "project", "order": 1 },
-        { "field": "date", "granularity": "month", "order": 2 }
+        { "type": "field", "field": "project", "order": 1 },
+        { "type": "field", "field": "date", "granularity": "month", "order": 2 }
       ]
-    },
-    "graph": {
+    }
+  },
+  "folderPage": {
+    "aggregation": {
+      "fields": [
+        { "type": "field", "field": "date", "granularity": "year", "order": 1 }
+      ]
+    }
+  },
+  "graph": {
+    "aggregation": {
       "folder": { "depth": 1 },
       "fields": [
-        { "field": "tags", "order": 1 }
-      ],
-      "colorBy": "project"
-    }
+        { "type": "field", "field": "tags", "order": 1 }
+      ]
+    },
+    "colorBy": "project"
   }
 }
 ```
@@ -106,7 +137,7 @@ interface AggregationConfig {
 ```json
 {
   "folder": { "depth": 2 },
-  "fields": [{ "field": "project", "order": 1 }]
+  "fields": [{ "type": "field", "field": "project", "order": 1 }]
 }
 ```
 - 总层级：2（文件夹）+ 1（字段）= 3 级
@@ -115,10 +146,9 @@ interface AggregationConfig {
 **示例 2**：
 ```json
 {
-  "folder": {},
   "fields": [
-    { "field": "project", "order": 1 },
-    { "field": "date", "granularity": "month", "order": 2 }
+    { "type": "field", "field": "project", "order": 1 },
+    { "type": "field", "field": "date", "granularity": "month", "order": 2 }
   ]
 }
 ```
@@ -294,8 +324,23 @@ interface GraphAggregationRenderer {
 
 ```typescript
 interface LayoutConfig {
-  // ... 现有字段
-  aggregation?: AggregationConfig
+  // 组件名作为第一级
+  explorer?: {
+    aggregation?: AggregationConfig
+    // sortBy?: SortByConfig  // TODO: 排序配置
+  }
+  backlinks?: {
+    hideWhenEmpty?: boolean
+    aggregation?: AggregationConfig
+  }
+  folderPage?: {
+    aggregation?: AggregationConfig
+    // sortBy?: SortByConfig  // TODO: 排序配置
+  }
+  graph?: {
+    aggregation?: AggregationConfig
+    colorBy?: string
+  }
 }
 
 // 读取配置
@@ -303,14 +348,14 @@ let layoutCfg: LayoutConfig = {}
 const settingsArg = process.argv.find((a) => a.startsWith("--settings="))
 if (settingsArg) {
   const settingsPath = settingsArg.split("=").slice(1).join("=")
-  const layoutJsonPath = path.join(settingsPath, "layout.json")
+  const layoutJsonPath = path.join(settingsPath, "quartz.layout.json")
   // ... 现有读取逻辑
 }
 
-// 传递给组件
+// 传递给组件（aggregation 现在内聚到组件配置下）
 const backlinksCfg = {
   hideWhenEmpty: layoutCfg.backlinks?.hideWhenEmpty ?? false,
-  aggregation: layoutCfg.aggregation?.backlinks,
+  aggregation: layoutCfg.backlinks?.aggregation,
 }
 ```
 
@@ -319,9 +364,97 @@ const backlinksCfg = {
 ```typescript
 interface BacklinksOptions {
   hideWhenEmpty: boolean
-  aggregation?: AggregationConfig["backlinks"]
+  aggregation?: AggregationConfig
 }
 ```
+
+---
+
+## 五.2、排序配置（TODO）
+
+### 设计背景
+
+Explorer2 文件浏览器和文件夹页需要支持排序功能，用户可按名称或日期排序。
+
+### 类型定义
+
+```typescript
+type SortKey = "name" | "date"
+type SortOrder = "asc" | "desc"
+
+interface SortByConfig {
+  key?: SortKey
+  order?: SortOrder
+}
+```
+
+### LayoutConfig 扩展
+
+```typescript
+interface LayoutConfig {
+  explorer?: {
+    sortBy?: SortByConfig
+    aggregation?: AggregationConfig
+  }
+  folderPage?: {
+    sortBy?: SortByConfig
+    aggregation?: AggregationConfig
+  }
+  // ...
+}
+```
+
+### 排序函数工厂
+
+```typescript
+function createSortFn(sortBy?: SortByConfig): (a: FileTrieNode, b: FileTrieNode) => number {
+  const key = sortBy?.key ?? "name"
+  const order = sortBy?.order ?? "asc"
+  const multiplier = order === "asc" ? 1 : -1
+
+  return (a: FileTrieNode, b: FileTrieNode) => {
+    // 文件夹始终优先
+    if (a.isFolder && !b.isFolder) return -1
+    if (!a.isFolder && b.isFolder) return 1
+
+    // 按指定 key 排序
+    if (key === "date") {
+      const dateA = a.data?.dates?.modified?.getTime() ?? 0
+      const dateB = b.data?.dates?.modified?.getTime() ?? 0
+      if (dateA === dateB) return a.displayName.localeCompare(b.displayName) * multiplier
+      return (dateA - dateB) * multiplier
+    }
+    // 默认按名称
+    return a.displayName.localeCompare(b.displayName) * multiplier
+  }
+}
+```
+
+### JSON 配置示例
+
+```json
+{
+  "explorer": {
+    "sortBy": {
+      "key": "date",
+      "order": "desc"
+    }
+  },
+  "folderPage": {
+    "sortBy": {
+      "key": "date",
+      "order": "desc"
+    }
+  }
+}
+```
+
+### 实现状态
+
+| 组件 | 排序配置 | 实现状态 |
+|------|---------|---------|
+| Explorer2 | `explorer.sortBy` | TODO |
+| 文件夹页 | `folderPage.sortBy` | TODO |
 
 ---
 
@@ -372,27 +505,41 @@ function assignNodeToGroup(node: GraphNode, rules: AggregationRule[]): string {
 
 ### Phase 1：配置结构与基础解析
 
-- [ ] 在 `quartz.layout.ts` 中添加 `aggregation` 配置读取
-- [ ] 定义 TypeScript 类型
-- [ ] 创建配置验证函数
+- [x] 重构 LayoutConfig 接口（v2 组件内聚设计）
+- [x] 定义 TypeScript 类型
+- [x] 读取 `quartz.layout.json` 配置
+- [ ] 添加旧格式兼容迁移逻辑
 
 ### Phase 2：反向链接聚合
 
-- [ ] 重构 `Backlinks.tsx` 分组算法
-- [ ] 实现文件夹聚合（复用现有逻辑）
-- [ ] 实现字段聚合
-- [ ] 集成 `aggregation.backlinks` 配置
+- [x] `Backlinks.tsx` 已有基础聚合实现
+- [x] 集成 `backlinks.aggregation` 配置
+- [x] 文件夹聚合支持 `depth` 和 `flatten`
+- [ ] 字段聚合完善
 - [ ] 样式适配
 
-### Phase 3：图谱聚合
+### Phase 3：Explorer2 排序配置
+
+- [ ] 定义 `SortByConfig` 类型
+- [ ] 实现 `createSortFn` 排序工厂
+- [ ] 集成 `explorer.sortBy` 配置
+- [ ] 支持 `name` / `date` 排序
+
+### Phase 4：文件夹页排序配置
+
+- [ ] 定义 `folderPage.sortBy` 配置
+- [ ] 实现文件夹页排序
+- [ ] 集成聚合配置
+
+### Phase 5：图谱聚合
 
 - [ ] 设计聚合节点渲染组件
 - [ ] 实现展开/折叠交互
-- [ ] 集成 `aggregation.graph` 配置
-- [ ] 实现 `colorBy` 着色
+- [ ] 集成 `graph.aggregation` 配置
+- [ ] 实现 `graph.colorBy` 着色
 - [ ] 处理有环情况
 
-### Phase 4：测试与优化
+### Phase 6：测试与优化
 
 - [ ] 多层级聚合测试
 - [ ] 大规模节点性能测试
@@ -407,8 +554,8 @@ function assignNodeToGroup(node: GraphNode, rules: AggregationRule[]): string {
 
 ```json
 {
-  "aggregation": {
-    "backlinks": {
+  "backlinks": {
+    "aggregation": {
       "folder": {}
     }
   }
@@ -419,22 +566,42 @@ function assignNodeToGroup(node: GraphNode, rules: AggregationRule[]): string {
 
 ```json
 {
-  "aggregation": {
-    "backlinks": {
-      "folder": { "depth": 3 },
+  "explorer": {
+    "sortBy": {
+      "key": "date",
+      "order": "desc"
+    }
+  },
+  "backlinks": {
+    "hideWhenEmpty": false,
+    "aggregation": {
+      "folder": { "depth": 3, "flatten": false },
       "fields": [
-        { "field": "project", "order": 1 },
-        { "field": "tags", "order": 2 },
-        { "field": "date", "granularity": "month", "order": 3 }
+        { "type": "field", "field": "project", "order": 1 },
+        { "type": "field", "field": "tags", "order": 2 },
+        { "type": "field", "field": "date", "granularity": "month", "order": 3 }
       ]
+    }
+  },
+  "folderPage": {
+    "sortBy": {
+      "key": "date",
+      "order": "desc"
     },
-    "graph": {
+    "aggregation": {
+      "fields": [
+        { "type": "field", "field": "date", "granularity": "year", "order": 1 }
+      ]
+    }
+  },
+  "graph": {
+    "aggregation": {
       "folder": { "depth": 1 },
       "fields": [
-        { "field": "project", "order": 1 }
-      ],
-      "colorBy": "tags"
-    }
+        { "type": "field", "field": "project", "order": 1 }
+      ]
+    },
+    "colorBy": "tags"
   }
 }
 ```
@@ -443,11 +610,55 @@ function assignNodeToGroup(node: GraphNode, rules: AggregationRule[]): string {
 
 ## 九、向后兼容
 
-| 现有配置 | 迁移方式 |
-|---------|---------|
-| `backlinks.hideWhenEmpty` | 保持兼容 |
-| `backlinks.groupBy: "folder" \| "none"` | 映射为 `aggregation.backlinks.folder: {}` 或 `null` |
+### v1 → v2 迁移
 
-迁移时自动转换：
-- `groupBy: "folder"` → `aggregation.backlinks.folder: {}`
-- `groupBy: "none"` → `aggregation.backlinks` 不设置
+旧配置格式（`aggregation` 独立一级）：
+
+```json
+{
+  "aggregation": {
+    "backlinks": {
+      "folder": { "depth": 2 },
+      "fields": [{ "field": "date", "order": 1 }]
+    }
+  }
+}
+```
+
+新配置格式（组件内聚）：
+
+```json
+{
+  "backlinks": {
+    "aggregation": {
+      "folder": { "depth": 2 },
+      "fields": [{ "type": "field", "field": "date", "order": 1 }]
+    }
+  }
+}
+```
+
+| 旧配置路径 | 新配置路径 |
+|-----------|-----------|
+| `aggregation.backlinks` | `backlinks.aggregation` |
+| `aggregation.graph` | `graph.aggregation` |
+| `aggregation.graph.colorBy` | `graph.colorBy` |
+
+迁移时自动转换（`quartz.layout.ts` 兼容层）：
+```typescript
+// 如果读到旧格式，自动迁移
+if ((layoutCfg as any).aggregation) {
+  const oldAgg = (layoutCfg as any).aggregation
+  if (oldAgg.backlinks) {
+    layoutCfg.backlinks = layoutCfg.backlinks ?? {}
+    layoutCfg.backlinks.aggregation = oldAgg.backlinks
+  }
+  if (oldAgg.graph) {
+    layoutCfg.graph = layoutCfg.graph ?? {}
+    layoutCfg.graph.aggregation = oldAgg.graph
+    if (oldAgg.graph.colorBy) {
+      layoutCfg.graph.colorBy = oldAgg.graph.colorBy
+    }
+  }
+}
+```

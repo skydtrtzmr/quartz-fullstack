@@ -8,7 +8,7 @@ Quartz static site generator with multi-domain support.
 - **Frontend**: TypeScript/React, D3.js/Pixi.js for graph rendering
 - **Backend**: Go server (quartz-service.exe) on :8766
 - **Build**: Node.js/TypeScript with esbuild
-- **Key Config**: domain_config.json controls per-domain settings
+- **Key Config**: quartz.config.json and quartz.layout.json in settings/{domain}/ control per-domain settings
 
 ## Code Standards
 

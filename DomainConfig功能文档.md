@@ -1,317 +1,309 @@
-# DomainConfig 功能文档与测试报告
+# DomainConfig 功能文档
 
-## 功能概述
+## 设计原则
 
-DomainConfig 是后端 Server 新增的业务域配置管理系统，用于：
-1. 管理多业务域（xm, xm1, xm2 等）的配置
-2. 通过 API 动态更新配置
-3. 自动生成 Client 需要的 config.json
+1. **简化配置**：只保留两个 JSON 文件，不使用 `domain_config.json`
+2. **Client 驱动**：配置在 Client 构建时被读取，Server 只负责 CRUD
+3. **目录即 Domain**：settings 下的子目录名即为 domain id
 
 ---
 
-## API 端点
+## 目录结构
 
-### 1. 获取业务域配置
 ```
-GET /api/domain/{domain}/config
-```
-
-**测试**：
-```bash
-curl "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password123"
+settings/{domain}/
+├── quartz.config.json   # 配置覆盖（baseUrl, pageTitle, graph）
+└── quartz.layout.json   # 布局配置（backlinks, explorer, aggregation）
 ```
 
-**响应**：
+### quartz.config.json
+
 ```json
 {
-  "domain_name": "xm",
-  "display_name": "测试业务域",
-  "description": "测试描述",
-  "root_folders": [
-    {
-      "name": "项目文档",
-      "display_name": "项目文档",
-      "description": "",
-      "icon": "📁",
-      "order": 1,
-      "visible": true
+  "baseUrl": "127.0.0.1:8767/testwork0",
+  "pageTitle": "testwork0",
+  "graph": {
+    "tags": {
+      "color": "#4a9eff",
+      "displayName": "标签"
     }
-  ],
-  "aggregation_fields": {
-    "graph_fields": [
-      {
-        "field_name": "tags",
-        "display_name": "标签",
-        "color": "#4a9eff",
-        "enabled": true
-      }
-    ],
-    "explorer_fields": [
-      {
-        "field_name": "folder",
-        "display_name": "文件夹",
-        "group_by": true,
-        "sort_order": 1
-      }
-    ]
-  },
-  "build_overrides": {
-    "base_url": "127.0.0.1:8767/xm",
-    "enable_graph": true
   }
 }
 ```
 
-**状态**: ✅ 测试通过
+### quartz.layout.json
+
+```json
+{
+  "backlinks": {
+    "hideWhenEmpty": false,
+    "aggregation": {
+      "folder": {
+        "depth": 1,
+        "flatten": true
+      },
+      "fields": [
+        { "field": "date", "granularity": "year", "order": 1 }
+      ]
+    }
+  }
+}
+```
 
 ---
 
-### 2. 更新业务域配置
-```
-PUT /api/domain/{domain}/config
+## 配置映射关系
+
+| 概念 | 来源 | 说明 |
+|------|------|------|
+| Domain ID | settings 子目录名 | 自动获取 |
+| Display Name | `quartz.config.json` 的 `pageTitle` | 用户可设置 |
+| Base URL | 服务器自动生成 | 由 `server/config.json` 的 `base_url` + domain 拼接，**不允许用户自定义** |
+| Graph 配置 | `quartz.config.json` 的 `graph` | 用户可设置 |
+| Layout 配置 | `quartz.layout.json` | 用户可设置 |
+
+---
+
+## Client 构建流程
+
+```bash
+npx quartz build --settings=settings/testwork0 -d input/testwork0 -o output/testwork0
 ```
 
-**测试**：
-```bash
-curl -X PUT "http://127.0.0.1:8766/api/domain/xm/config?user=admin&pwd=password123" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "domain_name": "xm",
-    "display_name": "测试业务域",
-    "description": "测试描述",
-    "root_folders": [{"name": "项目文档", "display_name": "项目文档", "icon": "📁", "order": 1, "visible": true}],
-    "aggregation_fields": {
-      "graph_fields": [{"field_name": "tags", "display_name": "标签", "color": "#4a9eff", "enabled": true}],
-      "explorer_fields": [{"field_name": "folder", "display_name": "文件夹", "group_by": true, "sort_order": 1}]
-    },
-    "build_overrides": {"base_url": "127.0.0.1:8767/xm", "enable_graph": true}
-  }'
+1. 读取 `settings/testwork0/quartz.config.json`
+2. deepMerge 到 `quartz.config.ts` 的 `configuration` 字段
+3. 读取 `settings/testwork0/quartz.layout.json`（如果有）
+4. 覆盖对应 layout 配置
+
+---
+
+## Server API
+
+### 1. 列出所有业务域
+```
+GET /api/domain
 ```
 
 **响应**：
 ```json
 {
-  "status": "Saved",
-  "domain": "xm"
+  "count": 2,
+  "domains": [
+    {
+      "domain_name": "xm",
+      "display_name": "源悦知识库",
+      "config": { "baseUrl": "...", "pageTitle": "源悦知识库", "graph": {...} },
+      "layout": { "backlinks": {...} }
+    },
+    {
+      "domain_name": "testwork0",
+      "display_name": "testwork0",
+      "config": { "baseUrl": "...", "pageTitle": "testwork0", "graph": {...} },
+      "layout": { "backlinks": {...} }
+    }
+  ]
 }
 ```
 
-**状态**: ✅ 测试通过
+---
+
+### 2. 获取业务域信息
+```
+GET /api/domain/{domain}
+```
+
+**响应**：
+```json
+{
+  "domain_name": "testwork0",
+  "display_name": "testwork0",
+  "config": { "baseUrl": "...", "pageTitle": "testwork0", "graph": {...} },
+  "layout": { "backlinks": {...} }
+}
+```
 
 ---
 
-### 3. 创建新业务域
+### 3. 创建业务域
 ```
 POST /api/domain/create
 ```
 
-**测试**：
-```bash
-curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123" \
-  -H "Content-Type: application/json" \
-  -d '{"domain_name": "xm2", "display_name": "业务域2", "description": "测试多业务域"}'
+**请求**：
+```json
+{
+  "domain_name": "xm1",
+  "display_name": "业务域1"
+}
 ```
 
 **响应**：
 ```json
 {
   "status": "Created",
-  "domain": "xm2",
+  "domain": "xm1",
   "message": "Domain created successfully"
 }
 ```
 
-**验证**：
-- `input/xm2/` 目录已创建 ✅
-- `settings/xm2/` 目录已创建 ✅
-- `settings/xm2/domain_config.json` 默认配置已生成 ✅
-- `input/xm2/index.md` 默认页面已创建 ✅
-
-**状态**: ✅ 测试通过
+**自动创建**：
+- `input/xm1/` 目录
+- `settings/xm1/quartz.config.json`
+- `settings/xm1/quartz.layout.json`
+- `input/xm1/index.md`
 
 ---
 
-### 4. 构建业务域（自动应用配置）
+### 4. 更新业务域配置
 ```
-POST /api/domain/{domain}/build
-```
-
-**测试**：
-```bash
-curl -X POST "http://127.0.0.1:8766/api/domain/xm/build?user=admin&pwd=password123"
+PUT /api/domain/{domain}
 ```
 
-**流程**：
-1. 加载 `settings/xm/domain_config.json` ✅
-2. 生成 `settings/xm/config.json` ✅
-3. 执行构建命令 ✅
-
-**生成的 config.json**：
+**请求**（`config` 和 `layout` 都是可选的，`baseUrl` 由服务器自动生成，**忽略用户传入的值**）：
 ```json
 {
-  "baseUrl": "127.0.0.1:8767/xm",
-  "graph": {
-    "tags": {
-      "displayName": "标签",
-      "color": "#4a9eff"
+  "config": {
+    "pageTitle": "新标题",
+    "graph": { "tags": { "color": "#ff0000", "displayName": "标签" } }
+  },
+  "layout": {
+    "backlinks": {
+      "hideWhenEmpty": false,
+      "aggregation": { "folder": { "depth": 2, "flatten": true }, "fields": [] }
     }
   }
 }
 ```
 
-**状态**: ✅ 测试通过
+**响应**：
+```json
+{
+  "status": "Saved",
+  "domain": "testwork0"
+}
+```
 
 ---
 
-## 配置数据结构
+### 5. 删除业务域
+```
+DELETE /api/domain/{domain}
+```
 
-### DomainConfig（后端 Go 结构）
+**请求体**（可选）：
+```json
+{
+  "delete_input": true,
+  "delete_output": true
+}
+```
+
+**响应**：
+```json
+{
+  "status": "Deleted",
+  "domain": "testwork0",
+  "message": "Domain deleted successfully",
+  "deletedInput": true,
+  "deletedOutput": true
+}
+```
+
+---
+
+### 6. 触发构建
+```
+POST /api/domain/{domain}/build
+```
+
+**参数**：`?optional=true` 启用 reset 模式
+
+**响应**：
+```json
+{
+  "status": "Accepted",
+  "message": "Build triggered for domain: testwork0",
+  "command": "node build --settings=settings/testwork0 -d input/testwork0 -o output/testwork0"
+}
+```
+
+---
+
+### 7. 获取构建状态
+```
+GET /api/domain/{domain}/status
+```
+
+**响应**（运行中）：
+```json
+{
+  "status": "running",
+  "domain": "testwork0",
+  "taskId": "testwork0-1745067600",
+  "startTime": "2026-04-19T15:00:00Z"
+}
+```
+
+**响应**（空闲）：
+```json
+{
+  "status": "idle",
+  "domain": "testwork0"
+}
+```
+
+---
+
+### 8. 获取构建日志
+```
+GET /api/domain/{domain}/logs
+```
+
+---
+
+## Go 数据结构
 
 ```go
-type DomainConfig struct {
-    DomainName        string              `json:"domain_name"`      // 业务域标识
-    DisplayName       string              `json:"display_name"`     // 显示名称
-    Description       string              `json:"description"`      // 描述
-    RootFolders       []RootFolderConfig  `json:"root_folders"`     // 一级目录配置
-    AggregationFields AggregationConfig   `json:"aggregation_fields"` // 聚合字段
-    BuildOverrides    BuildConfig         `json:"build_overrides"`  // 构建设置
+// QuartzConfig quartz.config.json 结构
+type QuartzConfig struct {
+    BaseUrl   string `json:"baseUrl"`
+    PageTitle string `json:"pageTitle"`
+    Graph     struct {
+        Tags struct {
+            Color       string `json:"color"`
+            DisplayName string `json:"displayName"`
+        } `json:"tags"`
+    } `json:"graph"`
 }
 
-type RootFolderConfig struct {
-    Name        string `json:"name"`         // 目录名
-    DisplayName string `json:"display_name"` // 显示名
-    Description string `json:"description"`  // 描述
-    Icon        string `json:"icon"`         // 图标
-    Order       int    `json:"order"`        // 排序
-    Visible     bool   `json:"visible"`      // 是否可见
+// QuartzLayout quartz.layout.json 结构
+type QuartzLayout struct {
+    Backlinks struct {
+        HideWhenEmpty bool `json:"hideWhenEmpty"`
+        Aggregation   struct {
+            Folder struct {
+                Depth   int  `json:"depth"`
+                Flatten bool `json:"flatten"`
+            } `json:"folder"`
+            Fields []struct {
+                Field       string `json:"field"`
+                Granularity string `json:"granularity"`
+                Order       int    `json:"order"`
+            } `json:"fields"`
+        } `json:"aggregation"`
+    } `json:"backlinks"`
 }
 
-type AggregationConfig struct {
-    GraphFields    []GraphFieldMapping    `json:"graph_fields"`
-    ExplorerFields []ExplorerFieldMapping `json:"explorer_fields"`
-}
-
-type GraphFieldMapping struct {
-    FieldName   string `json:"field_name"`   // 字段名（tags, category）
-    DisplayName string `json:"display_name"` // 显示名
-    Color       string `json:"color"`        // 颜色
-    Enabled     bool   `json:"enabled"`      // 是否启用
-}
-
-type ExplorerFieldMapping struct {
-    FieldName   string `json:"field_name"`   // 字段名
-    DisplayName string `json:"display_name"` // 显示名
-    GroupBy     bool   `json:"group_by"`     // 是否分组
-    SortOrder   int    `json:"sort_order"`   // 排序
-}
-
-type BuildConfig struct {
-    BaseUrl        string `json:"base_url,omitempty"`         // baseUrl
-    Theme          string `json:"theme,omitempty"`            // 主题
-    EnableGraph    *bool  `json:"enable_graph,omitempty"`     // 启用图谱
-    EnableExplorer *bool  `json:"enable_explorer,omitempty"`  // 启用目录
-    EnableSearch   *bool  `json:"enable_search,omitempty"`    // 启用搜索
+// DomainInfo 业务域信息
+type DomainInfo struct {
+    DomainName  string       `json:"domain_name"`
+    DisplayName string       `json:"display_name"`
+    Config      QuartzConfig `json:"config"`
+    Layout      QuartzLayout `json:"layout"`
 }
 ```
 
 ---
 
-## 文件映射关系
-
-### Server 管理的文件
-
-```
-settings/{domain}/
-├── domain_config.json   # Server 主配置（API 操作此文件）
-└── config.json          # Server 自动生成（供 Client 使用）
-```
-
-### 配置转换逻辑
-
-```go
-func (dm *DomainManager) generateQuartzConfig(config *DomainConfig) map[string]interface{} {
-    result := map[string]interface{}{
-        "baseUrl": config.BuildOverrides.BaseUrl,
-    }
-    
-    // 转换聚合字段为 graph 配置
-    if len(config.AggregationFields.GraphFields) > 0 {
-        graphConfig := make(map[string]interface{})
-        for _, field := range config.AggregationFields.GraphFields {
-            if field.Enabled {
-                graphConfig[field.FieldName] = map[string]string{
-                    "displayName": field.DisplayName,
-                    "color":       field.Color,
-                }
-            }
-        }
-        result["graph"] = graphConfig
-    }
-    
-    return result
-}
-```
-
----
-
-## 测试结果汇总
-
-| 功能 | 状态 | 备注 |
-|------|------|------|
-| 获取配置 GET | ✅ | 正常返回完整配置 |
-| 更新配置 PUT | ✅ | 配置保存成功 |
-| 创建域 POST | ✅ | 目录和默认配置创建成功 |
-| 删除配置 DELETE | ✅ | 未详细测试 |
-| 构建触发 POST | ✅ | 配置自动应用 |
-| 配置转换 | ✅ | config.json 正确生成 |
-
----
-
-## 已知限制
-
-1. **layout.json 未管理**
-   - Server 目前不生成 layout.json
-   - Client 的 layout 配置需手动维护
-
-2. **配置字段覆盖有限**
-   - Server 只生成 baseUrl 和 graph 字段
-   - Client 的其他 configuration 字段未覆盖
-
-3. **聚合字段未完全同步**
-   - Server 配置 AggregationFields.ExplorerFields
-   - Client Explorer 组件未读取此配置
-
----
-
-## 使用流程
-
-### 1. 初始化业务域
-```bash
-# 创建业务域（自动创建目录和默认配置）
-curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123" \
-  -d '{"domain_name": "xm1", "display_name": "业务域1"}'
-```
-
-### 2. 配置业务域
-```bash
-# 更新配置（可选）
-curl -X PUT "http://127.0.0.1:8766/api/domain/xm1/config?user=admin&pwd=password123" \
-  -d '{"domain_name": "xm1", "build_overrides": {"base_url": "127.0.0.1:8767/xm1"}}'
-```
-
-### 3. 添加内容
-在 `input/xm1/` 目录下添加 Markdown 文件。
-
-### 4. 构建
-```bash
-# 触发构建（自动应用配置）
-curl -X POST "http://127.0.0.1:8766/api/domain/xm1/build?user=admin&pwd=password123"
-```
-
-### 5. 访问
-浏览器访问：`http://127.0.0.1:8767/xm1/`
-
----
-
-**文档版本**: v1.0  
-**测试日期**: 2026-03-29
+**文档版本**: v3.0
+**更新日期**: 2026-04-19

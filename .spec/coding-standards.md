@@ -5,19 +5,29 @@
 ### 1.1 目录结构
 ```
 settings/{domain}/          # 业务域配置目录
-├── domain_config.json      # 业务域主配置（API管理）
-├── config.json             # Quartz运行时配置（Server自动生成）
-└── layout.json             # 布局覆盖配置（可选，手动维护）
+├── quartz.config.json      # Quartz 运行时配置（Server 管理）
+│   ├── pageTitle          # 显示名
+│   ├── baseUrl            # 由服务器自动生成
+│   └── graph              # 图谱聚合配置
+│
+└── quartz.layout.json      # 布局覆盖配置（Server 管理）
+    ├── backlinks          # 反向链接配置
+    └── aggregation         # 聚合分组配置
 ```
 
 ### 1.2 配置层级（优先级从低到高）
 1. `quartz.config.ts` / `quartz.layout.ts` - 代码默认配置
-2. `config.json` / `layout.json` - Server生成的域配置
+2. `quartz.config.json` / `quartz.layout.json` - Server 管理的域配置
 3. 运行时 URL 参数 - 临时覆盖
 
-### 1.3 示例文件存放
+### 1.3 baseUrl 生成规则
+- **不可用户自定义**：用户在 API 请求中传入的 `baseUrl` 会被忽略
+- **生成方式**：`{server config.json base_url}/{domain}`
+- 例如：服务器 base_url = `http://127.0.0.1:8766`，domain = `xm`，则 baseUrl = `http://127.0.0.1:8766/xm`
+
+### 1.4 示例文件存放
 - 位置：`server/examples/settings/`
-- 包含：完整的 domain_config.json、config.json、layout.json 示例
+- 包含：`quartz.config.json`、`quartz.layout.json` 示例
 - 用途：用户复制创建新 domain
 
 ## 2. API 设计规范
