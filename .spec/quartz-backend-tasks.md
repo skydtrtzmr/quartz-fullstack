@@ -19,7 +19,7 @@
 - [x] **构建状态与日志 API**：
   - `GET /api/domain/{domain}/status` - 获取指定 domain 的构建状态
   - `GET /api/domain/{domain}/logs` - 获取指定 domain 的构建日志
-  - `GET /api/domain/tasks` - 获取所有正在运行的任务
+  - `GET /api/tasks` - 获取所有正在运行的任务
   - 实现位置：`server/domain_config.go`
 
 - [x] **baseUrl 自动生成**：

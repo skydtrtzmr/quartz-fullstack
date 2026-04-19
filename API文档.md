@@ -24,7 +24,7 @@
 
 **方式1：URL 参数**
 ```
-GET /api/domain?user=admin&pwd=password123
+GET /api/domains?user=admin&pwd=password123
 ```
 
 **方式2：Cookie**
@@ -42,12 +42,12 @@ GET /api/domain?user=admin&pwd=password123
 ### 1. 列出所有业务域
 
 ```
-GET /api/domain
+GET /api/domains
 ```
 
 **请求示例**：
 ```bash
-curl "http://127.0.0.1:8766/api/domain?user=admin&pwd=password123"
+curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
 ```
 
 **响应**：
