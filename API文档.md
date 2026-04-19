@@ -59,8 +59,8 @@ curl "http://127.0.0.1:8766/api/domain?user=admin&pwd=password123"
       "domain_name": "xm",
       "display_name": "源悦知识库",
       "config": {
-        "baseUrl": "127.0.0.1:8767/xm",
         "pageTitle": "源悦知识库",
+        "baseUrl": "http://127.0.0.1:8766/xm",
         "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
       },
       "layout": {
@@ -70,7 +70,7 @@ curl "http://127.0.0.1:8766/api/domain?user=admin&pwd=password123"
     {
       "domain_name": "testwork0",
       "display_name": "testwork0",
-      "config": { ... },
+      "config": { "pageTitle": "testwork0", "baseUrl": "http://127.0.0.1:8766/testwork0", "graph": { ... } },
       "layout": { ... }
     }
   ]
@@ -132,8 +132,8 @@ curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
   "domain_name": "xm",
   "display_name": "源悦知识库",
   "config": {
-    "baseUrl": "127.0.0.1:8767/xm",
     "pageTitle": "源悦知识库",
+    "baseUrl": "http://127.0.0.1:8766/xm",
     "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
   },
   "layout": {
@@ -151,11 +151,10 @@ PUT /api/domain/{domain}
 POST /api/domain/{domain}
 ```
 
-**请求体**（`config` 和 `layout` 都是可选的）：
+**请求体**（`config` 和 `layout` 都是可选的，`baseUrl` 由服务器自动生成，用户传入的值会被忽略）：
 ```json
 {
   "config": {
-    "baseUrl": "127.0.0.1:8767/xm",
     "pageTitle": "新标题",
     "graph": {
       "tags": {
@@ -524,7 +523,7 @@ curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123
 curl -X PUT "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
   -d '{
-    "config": {"pageTitle": "业务域1", "baseUrl": "127.0.0.1:8767/xm1"},
+    "config": {"pageTitle": "业务域1"},
     "layout": {"backlinks": {"hideWhenEmpty": false}}
   }'
 ```
@@ -537,9 +536,11 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1/build?user=admin&pwd=password
 
 ### 5. 访问网站
 
-浏览器访问：`http://127.0.0.1:8767/xm1/`
+浏览器访问：`http://127.0.0.1:8766/xm1/`
+
+> 注意：`baseUrl` 由服务器自动生成，格式为 `{server config.json base_url}/{domain}`。
 
 ---
 
-**文档版本**: v2.0
+**文档版本**: v3.0
 **更新日期**: 2026-04-19
