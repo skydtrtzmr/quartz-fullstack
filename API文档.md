@@ -82,25 +82,26 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
 ### 2. 创建业务域
 
 ```
-POST /api/domain/create
+POST /api/domain/{domain}
 ```
 
-**请求体**：
+**请求体**（`config` 和 `layout` 都是可选的，未传则使用默认值）：
 ```json
 {
-  "domain_name": "xm1",
-  "display_name": "业务域1"
+  "config": {
+    "pageTitle": "业务域1"
+  }
 }
 ```
 
 **请求示例**：
 ```bash
-curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123" \
+curl -X POST "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"domain_name": "xm1", "display_name": "业务域1"}'
+  -d '{"config": {"pageTitle": "业务域1"}}'
 ```
 
-**响应**：
+**响应**（成功）：
 ```json
 {
   "status": "Created",
@@ -109,9 +110,18 @@ curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123
 }
 ```
 
+**响应**（域名已存在）：
+```json
+{
+  "error": "Domain 'xm1' already exists"
+}
+```
+
 **说明**：
+- 域名从 URL 路径中获取，不再从 body 中传 `domain_name`
 - 自动创建 `input/xm1/` 和 `settings/xm1/` 目录
 - 自动生成默认的 `quartz.config.json`、`quartz.layout.json` 和 `index.md`
+- 可在 body 中传入 `config` 和/或 `layout` 覆盖默认值
 
 ---
 
@@ -508,9 +518,9 @@ quartz-fullstack/
 ### 1. 创建新业务域 xm1
 
 ```bash
-curl -X POST "http://127.0.0.1:8766/api/domain/create?user=admin&pwd=password123" \
+curl -X POST "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"domain_name": "xm1", "display_name": "业务域1"}'
+  -d '{"config": {"pageTitle": "业务域1"}}'
 ```
 
 ### 2. 添加 Markdown 文件

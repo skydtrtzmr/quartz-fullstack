@@ -108,7 +108,7 @@ type DomainTaskManager struct {
 | 方法 | 端点 | 说明 |
 |------|------|------|
 | GET | `/api/domain` | 列出所有业务域 |
-| POST | `/api/domain/create` | 创建业务域 |
+| POST | `/api/domain/{domain}` | 创建业务域 |
 | GET | `/api/domain/{domain}` | 获取业务域信息 |
 | PUT | `/api/domain/{domain}` | 更新业务域配置（config + layout） |
 | DELETE | `/api/domain/{domain}` | 删除业务域 |
