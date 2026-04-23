@@ -1,0 +1,56 @@
+meta {
+  name: 修改业务域配置
+  type: http
+  seq: 8
+}
+
+put {
+  url: 127.0.0.1:8766/api/domain/xm2?user=admin&pwd=password123
+  body: json
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+}
+
+body:json {
+  {
+    "config": {
+      "baseUrl": "127.0.0.1:8766/xm2",
+      "pageTitle": "我的项目知识库",
+      "graph": {
+        "tags": {
+          "color": "#4a9eff",
+          "displayName": "标签"
+        },
+        "category": {
+          "color": "#ff6b6b",
+          "displayName": "分类"
+        }
+      }
+    },
+    "layout": {
+      "backlinks": {
+        "hideWhenEmpty": false,
+        "aggregation": {
+          "folder": {
+            "depth": 2,
+            "flatten": true
+          },
+          "fields": [
+            { "field": "date", "granularity": "year", "order": 1 },
+            { "field": "tags", "granularity": "none", "order": 2 }
+          ]
+        }
+      }
+    }
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

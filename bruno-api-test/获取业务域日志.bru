@@ -1,0 +1,21 @@
+meta {
+  name: 获取业务域日志
+  type: http
+  seq: 6
+}
+
+get {
+  url: 127.0.0.1:8766/api/domain/testwork0/logs?user=admin&pwd=password123
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

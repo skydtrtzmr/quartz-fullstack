@@ -1,0 +1,26 @@
+meta {
+  name: 触发指定业务域构建
+  type: http
+  seq: 4
+}
+
+post {
+  url: 127.0.0.1:8766/api/domain/xm2/build?user=admin&pwd=password123&reset=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+  reset: true
+}
+
+vars:pre-request {
+  domain: xm
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

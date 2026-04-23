@@ -1,0 +1,21 @@
+meta {
+  name: 列出所有业务域
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://127.0.0.1:8766/api/domains?user=admin&pwd=password123
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
