@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: 127.0.0.1:8766/api/domain/create?user=admin&pwd=password123
+  url: 127.0.0.1:8766/api/domain/xm2?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -17,9 +17,9 @@ params:query {
 
 body:json {
   {
-    "domain_name": "xm3",
-    "display_name": "xm3",
-    "description": "这是大型测试业务域3"
+    "config": {
+      "pageTitle": "业务域1"
+    }
   }
 }
 
