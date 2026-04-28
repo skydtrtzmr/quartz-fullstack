@@ -4,6 +4,18 @@
 
 为 Backlinks、Explorer、FolderContent 三个组件提供统一的排序配置能力，通过 `quartz.layout.json` 进行配置覆盖。
 
+## 配置结构
+
+```json
+{
+  "sort": {
+    "type": "natural",
+    "order": "asc",
+    "field": "title"
+  }
+}
+```
+
 ## 类型定义
 
 ```ts
@@ -35,14 +47,14 @@ interface SortConfig {
 }
 ```
 
-## field 默认值
+## 各参数默认值
 
-| type | field 默认值 | 说明 |
-|------|-------------|------|
-| `date` | `'date'` | frontmatter 的 date 字段 |
-| `numeric` | 无默认 | 必须显式指定字段 |
-| `natural` | `'title'` | frontmatter 的 title 字段 |
-| `lexical` | `'title'` | frontmatter 的 title 字段 |
+| type | order 默认 | field 默认 | 说明 |
+|------|-----------|-----------|------|
+| `natural` | `'asc'` | `'title'` | frontmatter 的 title 字段 |
+| `lexical` | `'asc'` | `'title'` | frontmatter 的 title 字段 |
+| `date` | `'desc'` | `'date'` | frontmatter 的 date 字段 |
+| `numeric` | `'asc'` | 无默认 | 必须显式指定字段 |
 
 ## 降级逻辑（Fallback Chain）
 
@@ -131,24 +143,21 @@ function getNumericFieldValue(item: FileData, field: string): number {
 | Explorer | `natural` | `asc` | `title` |
 | FolderContent | `natural` | `asc` | `title` |
 
+## 实现文件清单
+
+| 文件 | 变更内容 | 状态 |
+|------|---------|------|
+| `quartz/util/sort.ts` | 公共类型定义 + 泛型比较器工厂 | ✅ 已完成 |
+| `quartz/components/pages/FolderContent.tsx` | 接收 SortConfig，内部实现 getter + 排序函数 | ✅ 已完成 |
+| `quartz/plugins/emitters/folderPage.tsx` | 从 quartz.layout.ts 导入 folderPageSort 传给 FolderContent | ✅ 已完成 |
+| `quartz.layout.ts` | LayoutConfig 加 sort 字段，导出 folderPageSort | ✅ 已完成 |
+| `quartz/components/Explorer2.tsx` | 新增 sort 选项，映射到已有 sortFn | ⏳ 待实现 |
+| `quartz/components/Backlinks.tsx` | 新增 sort 选项，构建时+运行时排序 | ⏳ 待实现 |
+
 ## quartz.layout.json 配置示例
 
 ```json
 {
-  "backlinks": {
-    "sort": {
-      "type": "date",
-      "order": "desc",
-      "field": "date"
-    },
-    "hideWhenEmpty": false
-  },
-  "explorer": {
-    "sort": {
-      "type": "natural",
-      "order": "asc"
-    }
-  },
   "folderPage": {
     "sort": {
       "type": "date",
@@ -158,17 +167,6 @@ function getNumericFieldValue(item: FileData, field: string): number {
   }
 }
 ```
-
-## 实现文件清单
-
-| 文件 | 变更内容 | 状态 |
-|------|---------|------|
-| `quartz/util/sort.ts` | 公共类型定义 + 泛型比较器工厂（createStringComparator / createDateComparator / createNumericComparator） | ⏳ 待更新 |
-| `quartz/components/pages/FolderContent.tsx` | 接收 SortConfig，内部构建 SortFn | ⏳ 待更新 |
-| `quartz/plugins/emitters/folderPage.tsx` | 从 quartz.layout.ts 导入 folderPageSort 传给 FolderContent | ✅ 已完成 |
-| `quartz.layout.ts` | LayoutConfig 加 sort 字段，导出 folderPageSort | ✅ 已完成 |
-| `quartz/components/Explorer2.tsx` | 新增 sort 选项，映射到已有 sortFn | ⏳ 待实现 |
-| `quartz/components/Backlinks.tsx` | 新增 sort 选项，构建时+运行时排序 | ⏳ 待实现 |
 
 ## 设计原则
 
