@@ -17,40 +17,89 @@ params:query {
 
 body:json {
   {
-    "config": {
-      "baseUrl": "127.0.0.1:8766/xm2",
-      "pageTitle": "我的项目知识库",
-      "graph": {
-        "tags": {
-          "color": "#4a9eff",
-          "displayName": "标签"
-        },
-        "category": {
-          "color": "#ff6b6b",
-          "displayName": "分类"
-        }
-      }
-    },
     "layout": {
       "backlinks": {
         "hideWhenEmpty": false,
+        "sort": {
+          "type": "natural",
+          "order": "desc",
+          "field": ""
+        },
         "aggregation": {
-          "folder": {
-            "depth": 2,
-            "flatten": true
-          },
+          "folder": { "depth": 2, "flatten": true },
           "fields": [
             { "field": "date", "granularity": "year", "order": 1 },
-            { "field": "tags", "granularity": "none", "order": 2 }
+            { "field": "date", "granularity": "month", "order": 2 }
           ]
         }
       }
     }
   }
-  
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+example {
+  name: example1
+  
+  request: {
+    url: 127.0.0.1:8766/api/domain/xm2?user=admin&pwd=password123
+    method: PUT
+    mode: json
+    params:query: {
+      user: admin
+      pwd: password123
+    }
+  
+    body:json: {
+      {
+        "config": {
+          "pageTitle": "我的项目知识库",
+          "graph": {
+            "tags": {
+              "color": "#4a9eff",
+              "displayName": "标签"
+            },
+            "category": {
+              "color": "#ff6b6b",
+              "displayName": "分类"
+            }
+          }
+        },
+        "layout": {
+          "backlinks": {
+            "hideWhenEmpty": false,
+            "aggregation": {
+              "folder": {
+                "depth": 2,
+                "flatten": true
+              },
+              "fields": [
+                { "field": "date", "granularity": "year", "order": 1 },
+                { "field": "tags", "granularity": "none", "order": 2 }
+              ]
+            }
+          }
+        }
+      }
+                
+    }
+  }
+  
+  response: {
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: text
+      content: '''
+  
+      '''
+    }
+  }
 }

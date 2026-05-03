@@ -151,18 +151,30 @@ function getNumericFieldValue(item: FileData, field: string): number {
 | `quartz/components/pages/FolderContent.tsx` | 接收 SortConfig，内部实现 getter + 排序函数 | ✅ 已完成 |
 | `quartz/plugins/emitters/folderPage.tsx` | 从 quartz.layout.ts 导入 folderPageSort 传给 FolderContent | ✅ 已完成 |
 | `quartz.layout.ts` | LayoutConfig 加 sort 字段，导出 folderPageSort | ✅ 已完成 |
-| `quartz/components/Explorer2.tsx` | 新增 sort 选项，映射到已有 sortFn | ⏳ 待实现 |
-| `quartz/components/Backlinks.tsx` | 新增 sort 选项，构建时+运行时排序 | ⏳ 待实现 |
+| `quartz/components/Explorer2.tsx` | 新增 sort 选项，实现 createExplorerSortFn，文件夹始终优先 | ✅ 已完成 |
+| `quartz/components/Backlinks.tsx` | 新增 sort 选项，构建时+运行时排序 | ✅ 已完成 |
 
 ## quartz.layout.json 配置示例
 
 ```json
 {
-  "folderPage": {
+  "explorer": {
     "sort": {
       "type": "date",
-      "order": "desc",
-      "field": "published"
+      "order": "desc"
+    }
+  },
+  "folderPage": {
+    "sort": {
+      "type": "numeric",
+      "order": "asc",
+      "field": "Index"
+    }
+  },
+  "backlinks": {
+    "sort": {
+      "type": "date",
+      "order": "desc"
     }
   }
 }
