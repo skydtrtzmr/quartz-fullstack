@@ -397,24 +397,78 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 }
 ```
 
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `pageTitle` | string | 页面标题/业务域显示名称 |
+| `graph.tags.color` | string | 图谱标签节点颜色 |
+| `graph.tags.displayName` | string | 图谱标签节点显示名 |
+
 ### quartz.layout.json
+
+**所有字段均为可选**，不传则使用前端默认值。
 
 ```json
 {
+  "explorer": {
+    "sort": {
+      "type": "natural",
+      "order": "asc",
+      "field": ""
+    }
+  },
+  "folderPage": {
+    "sort": {
+      "type": "natural",
+      "order": "asc",
+      "field": ""
+    }
+  },
   "backlinks": {
     "hideWhenEmpty": false,
+    "sort": {
+      "type": "natural",
+      "order": "desc",
+      "field": ""
+    },
     "aggregation": {
       "folder": {
         "depth": 1,
         "flatten": true
       },
       "fields": [
-        { "field": "date", "granularity": "year", "order": 1 }
+        { "field": "date", "granularity": "year", "order": 1 },
+        { "field": "type", "order": 2 }
+      ]
+    }
+  },
+  "graph": {
+    "aggregation": {
+      "fields": [
+        { "field": "type", "order": 1 }
       ]
     }
   }
 }
 ```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `explorer.sort.type` | string | 文件浏览器排序方式：`natural` \| `lexical` \| `date` \| `numeric` |
+| `explorer.sort.order` | string | 排序方向：`asc` \| `desc` |
+| `explorer.sort.field` | string | 排序字段名（前端 JS 属性名） |
+| `folderPage.sort.*` | - | 文件夹页面排序（字段同 explorer.sort） |
+| `backlinks.hideWhenEmpty` | bool | 无反向链接时是否隐藏组件 |
+| `backlinks.sort.*` | - | 反向链接排序（可选，字段同 explorer.sort） |
+| `backlinks.aggregation.folder.depth` | int | 文件夹聚合深度（按路径层级分组） |
+| `backlinks.aggregation.folder.flatten` | bool | 是否扁平化深层文件夹 |
+| `backlinks.aggregation.fields[].field` | string | 聚合字段名（frontmatter 属性） |
+| `backlinks.aggregation.fields[].granularity` | string | 日期字段粒度：`year` \| `month` \| `quarter`（仅 `field: "date"` 时生效） |
+| `backlinks.aggregation.fields[].order` | int | 聚合字段显示顺序 |
+| `graph.aggregation.fields[].field` | string | 图谱聚合字段名（与 backlinks 聚合结构一致） |
+| `graph.aggregation.fields[].granularity` | string | 图谱聚合日期粒度（可选，同 backlinks） |
+| `graph.aggregation.fields[].order` | int | 图谱聚合字段顺序 |
+
+> **注意**：`graph.aggregation` 与 `backlinks.aggregation` 共享相同的 `fields` 结构，但图谱聚合**只在全局图谱且 `depth: -1` 时生效**，用于将单链接边缘节点按字段值分组。字段值为空的节点不参与聚合。
 
 ### DomainInfo（API 响应结构）
 
@@ -461,9 +515,9 @@ quartz-fullstack/
 
 ```json
 {
+  "version": "1.0.1",
   "listen_addr": "0.0.0.0:8766",
   "base_url": "http://127.0.0.1:8766",
-  "build_path": "/api/build",
   "optional_param": "reset",
   "forbidden_page": "401.html",
   "auth": {
@@ -474,28 +528,68 @@ quartz-fullstack/
     "cookie_max_age": 0
   },
   "command": {
-    "work_dir": "E:/ProgramProjects/VScode_projects/quartz-fullstack/client",
+    "work_dir": "/path/to/quartz-fullstack/client",
     "interpreter": "node",
     "interpreter_args": "--no-deprecation",
     "script": "./quartz/bootstrap-cli.mjs",
     "args": "build --sqlite",
     "optional_flag": "--reset"
   },
-  "input_dir": "E:/ProgramProjects/VScode_projects/quartz-fullstack/input",
-  "output_dir": "E:/ProgramProjects/VScode_projects/quartz-fullstack/output",
-  "settings_dir": "E:/ProgramProjects/VScode_projects/quartz-fullstack/settings",
+  "input_dir": "/path/to/quartz-fullstack/input",
+  "output_dir": "/path/to/quartz-fullstack/output",
+  "settings_dir": "/path/to/quartz-fullstack/settings",
   "compression": {
     "enabled": true,
     "level": 6,
-    "min_size_kb": 1
+    "min_size_kb": 1,
+    "types": [
+      "text/html",
+      "text/css",
+      "text/javascript",
+      "application/javascript",
+      "application/json",
+      "text/xml",
+      "application/xml"
+    ]
   },
   "chunked_transfer": {
     "enabled": true,
     "threshold_kb": 1024,
     "buffer_size_kb": 32
-  }
+  },
+  "cleanup_ignore": [".*", "*.gitkeep"]
 }
 ```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `version` | string | 配置格式版本号 |
+| `listen_addr` | string | 监听地址和端口 |
+| `base_url` | string | 服务器基础 URL（用于生成业务域 baseUrl） |
+| `optional_param` | string | 构建 API 的 reset 参数名 |
+| `forbidden_page` | string | 401 页面文件名 |
+| `auth.user_param` | string | 认证用户名参数名 |
+| `auth.pwd_param` | string | 认证密码参数名 |
+| `auth.user` | string | 用户名 |
+| `auth.pwd` | string | 密码 |
+| `auth.cookie_max_age` | int | Cookie 有效期（秒，0=会话级）|
+| `command.work_dir` | string | 构建命令的工作目录 |
+| `command.interpreter` | string | 构建命令解释器 |
+| `command.interpreter_args` | string | 解释器参数 |
+| `command.script` | string | 构建脚本路径 |
+| `command.args` | string | 构建脚本参数 |
+| `command.optional_flag` | string | 可选的 reset 构建参数 |
+| `input_dir` | string | Markdown 输入根目录 |
+| `output_dir` | string | 构建输出根目录 |
+| `settings_dir` | string | 业务域配置根目录 |
+| `compression.enabled` | bool | 是否启用 gzip 压缩 |
+| `compression.level` | int | 压缩级别（1-9） |
+| `compression.min_size_kb` | int | 最小压缩阈值（KB） |
+| `compression.types[]` | string[] | 需要压缩的 MIME 类型列表 |
+| `chunked_transfer.enabled` | bool | 是否启用分块传输 |
+| `chunked_transfer.threshold_kb` | int | 分块传输阈值（KB） |
+| `chunked_transfer.buffer_size_kb` | int | 分块缓冲区大小（KB） |
+| `cleanup_ignore[]` | string[] | output 清理时忽略的 glob 模式 |
 
 ---
 
