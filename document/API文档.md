@@ -64,7 +64,7 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
         "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
       },
       "layout": {
-        "backlinks": { "hideWhenEmpty": false, "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [] } }
+        "backlinks": { "hideWhenEmpty": false, "aggregation": [{ "type": "folder", "depth": 1 }] }
       }
     },
     {
@@ -146,10 +146,10 @@ curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
     "baseUrl": "http://127.0.0.1:8766/xm",
     "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
   },
-  "layout": {
-    "backlinks": { "hideWhenEmpty": false, "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [] } },
-    "graph": { "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [{ "field": "type", "order": 1 }] } }
-  }
+    "layout": {
+      "backlinks": { "hideWhenEmpty": false, "aggregation": [{ "type": "folder", "depth": 1 }] },
+      "graph": { "aggregation": [{ "type": "folder", "depth": 1 }, { "type": "field", "field": "type" }] }
+    }
 }
 ```
 
@@ -414,7 +414,7 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 ### quartz.layout.json
 
-**所有字段均为可选**，不传则使用前端默认值。反向链接和图谱**共用同一 `AggregationConfig` 结构**，都支持 `folder` 和 `fields` 聚合维度，且都是文件夹优先聚合。
+**所有字段均为可选**，不传则使用前端默认值。反向链接和图谱**共用同一 `AggregationConfig` 结构**，均为 `AggregationRule[]` 规则列表，按数组顺序执行。
 
 ```json
 {
@@ -439,27 +439,17 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
       "order": "desc",
       "field": ""
     },
-    "aggregation": {
-      "folder": {
-        "depth": 1,
-        "flatten": true
-      },
-      "fields": [
-        { "field": "date", "granularity": "year", "order": 1 },
-        { "field": "type", "order": 2 }
-      ]
-    }
+    "aggregation": [
+      { "type": "folder", "depth": 1 },
+      { "type": "field", "field": "date", "granularity": "year" },
+      { "type": "field", "field": "type" }
+    ]
   },
   "graph": {
-    "aggregation": {
-      "folder": {
-        "depth": 1,
-        "flatten": true
-      },
-      "fields": [
-        { "field": "type", "order": 1 }
-      ]
-    }
+    "aggregation": [
+      { "type": "folder", "depth": 1 },
+      { "type": "field", "field": "type" }
+    ]
   }
 }
 ```
@@ -473,13 +463,13 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 | `backlinks.hideWhenEmpty` | bool | 无反向链接时是否隐藏组件 |
 | `backlinks.sort.*` | - | 反向链接排序（可选，字段同 explorer.sort） |
 | **聚合配置（backlinks / graph 共用同一结构）** | | |
-| `{component}.aggregation.folder.depth` | int | 文件夹聚合深度：`-1`=完整层级, `0`=禁用, 默认 `1` |
-| `{component}.aggregation.folder.flatten` | bool | 是否扁平化深层文件夹，默认 `true` |
-| `{component}.aggregation.fields[].field` | string | 聚合字段名（frontmatter 属性） |
-| `{component}.aggregation.fields[].granularity` | string | 日期字段粒度：`year` \| `month` \| `quarter`（仅 `field: "date"` 时生效） |
-| `{component}.aggregation.fields[].order` | int | 聚合字段显示顺序，值越小越先匹配 |
+| `{component}.aggregation[]` | `AggregationRule[]` | 聚合规则列表，按数组顺序执行 |
+| `{component}.aggregation[].type` | string | 聚合维度类型：`folder` \| `field` \| `date` |
+| `{component}.aggregation[].field` | string | 字段名（`field`/`date` 用，`folder` 可省略） |
+| `{component}.aggregation[].depth` | int | 文件夹截取深度（仅 `folder` 有效，默认 `1`） |
+| `{component}.aggregation[].granularity` | string | 日期粒度：`year` \| `month` \| `quarter`（仅 `date` 有效） |
 
-> **注意**：`backlinks.aggregation` 与 `graph.aggregation` 共用完全相同的结构（`AggregationConfig`），都包含 `folder` 和 `fields`。配置时按需选用。图谱聚合中，`folder` 按节点文件路径分组，`fields` 按 frontmatter 字段分组，文件夹始终优先于字段聚合。
+> **注意**：`backlinks.aggregation` 与 `graph.aggregation` 共用完全相同的结构（`AggregationConfig`），均为规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。不再使用 `order` 字段，也不再区分 `folder` 和 `fields` 两个独立配置块。
 
 ### DomainInfo（API 响应结构）
 

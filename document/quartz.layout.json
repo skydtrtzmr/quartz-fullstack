@@ -20,27 +20,17 @@
       "order": "desc",
       "field": "date"
     },
-    "aggregation": {
-      "folder": {
-        "depth": 1,
-        "flatten": false
-      },
-      "fields": [
-        { "field": "date", "granularity": "year", "order": 1 },
-        { "field": "type", "order": 2 }
-      ]
-    }
+    "aggregation": [
+      { "type": "folder", "depth": 1 },
+      { "type": "date", "field": "date", "granularity": "year" },
+      { "type": "field", "field": "type" }
+    ]
   },
   "graph": {
-    "aggregation": {
-      "folder": {
-        "depth": 1,
-        "flatten": true
-      },
-      "fields": [
-        { "field": "tags", "order": 1 },
-        { "field": "type", "order": 2 }
-      ]
-    }
+    "aggregation": [
+      { "type": "folder", "depth": 1 },
+      { "type": "field", "field": "tags" },
+      { "type": "field", "field": "type" }
+    ]
   }
 }

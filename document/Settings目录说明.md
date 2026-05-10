@@ -36,10 +36,13 @@ server/examples/settings/
 | `backlinks.hideWhenEmpty` | 无反向链接时是否隐藏 |
 | `backlinks.sort` | 反向链接排序配置 |
 | **聚合配置（backlinks / graph 共用同一结构）** | |
-| `{component}.aggregation.folder` | 文件夹聚合配置（depth） |
-| `{component}.aggregation.fields` | 字段聚合配置（field / granularity / order） |
+| `{component}.aggregation[]` | 聚合规则列表，按数组顺序执行 |
+| `{component}.aggregation[].type` | 聚合维度类型：`folder` \| `field` \| `date` |
+| `{component}.aggregation[].field` | 字段名（`field`/`date` 用，`folder` 可省略） |
+| `{component}.aggregation[].depth` | 文件夹截取深度（仅 `folder` 有效） |
+| `{component}.aggregation[].granularity` | 日期粒度：`year` \| `month` \| `quarter`（仅 `date` 有效） |
 
-`backlinks.aggregation` 和 `graph.aggregation` 使用**完全相同的结构**（`AggregationConfig`），都包含 `folder` 和 `fields`，且文件夹优先于字段聚合。
+`backlinks.aggregation` 和 `graph.aggregation` 使用**完全相同的结构**（`AggregationConfig`），均为 `AggregationRule[]` 规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。
 
 ## 创建新业务域
 
