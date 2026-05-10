@@ -2,18 +2,6 @@
 """
 打包项目为 zip 压缩包，排除不需要的文件和目录。
 
-排除规则：
-- node_modules/
-- .spec/
-- input/ (保留 .gitkeep)
-- output/ (保留 .gitkeep)
-- settings/ (用户私有配置)
-- *.log
-- .git/
-- client/node_modules/ (如果存在)
-- server/*.exe
-- bruno-api-test/ (可选)
-
 输出：quartz-fullstack-<timestamp>.zip
 """
 
@@ -37,17 +25,21 @@ EXCLUDE_PATTERNS = [
     ".spec",
     "input/*",
     "output/*",
-    "settings",
+    "settings/*",
     "*.log",
     ".git",
-    "bruno-api-test",
-    "*.exe",
+    ".claude",
+    "scripts/*",
+    ".gitignore",
+    ".gitmodules",
+    "*.zip"
 ]
 
 # 保留的文件（即使匹配排除规则）
 INCLUDE_PATTERNS = [
     "input/.gitkeep",
     "output/.gitkeep",
+    "settings/.gitkeep"
 ]
 
 
