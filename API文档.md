@@ -147,7 +147,8 @@ curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
     "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
   },
   "layout": {
-    "backlinks": { "hideWhenEmpty": false, "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [] } }
+    "backlinks": { "hideWhenEmpty": false, "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [] } },
+    "graph": { "aggregation": { "folder": { "depth": 1, "flatten": true }, "fields": [{ "field": "type", "order": 1 }] } }
   }
 }
 ```
@@ -183,6 +184,14 @@ POST /api/domain/{domain}
         },
         "fields": [
           { "field": "date", "granularity": "year", "order": 1 }
+        ]
+      }
+    },
+    "graph": {
+      "aggregation": {
+        "folder": { "depth": 1, "flatten": true },
+        "fields": [
+          { "field": "type", "order": 1 }
         ]
       }
     }
@@ -405,7 +414,7 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 ### quartz.layout.json
 
-**所有字段均为可选**，不传则使用前端默认值。
+**所有字段均为可选**，不传则使用前端默认值。反向链接和图谱**共用同一 `AggregationConfig` 结构**，都支持 `folder` 和 `fields` 聚合维度，且都是文件夹优先聚合。
 
 ```json
 {
@@ -443,6 +452,10 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
   },
   "graph": {
     "aggregation": {
+      "folder": {
+        "depth": 1,
+        "flatten": true
+      },
       "fields": [
         { "field": "type", "order": 1 }
       ]
@@ -459,16 +472,14 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 | `folderPage.sort.*` | - | 文件夹页面排序（字段同 explorer.sort） |
 | `backlinks.hideWhenEmpty` | bool | 无反向链接时是否隐藏组件 |
 | `backlinks.sort.*` | - | 反向链接排序（可选，字段同 explorer.sort） |
-| `backlinks.aggregation.folder.depth` | int | 文件夹聚合深度（按路径层级分组） |
-| `backlinks.aggregation.folder.flatten` | bool | 是否扁平化深层文件夹 |
-| `backlinks.aggregation.fields[].field` | string | 聚合字段名（frontmatter 属性） |
-| `backlinks.aggregation.fields[].granularity` | string | 日期字段粒度：`year` \| `month` \| `quarter`（仅 `field: "date"` 时生效） |
-| `backlinks.aggregation.fields[].order` | int | 聚合字段显示顺序 |
-| `graph.aggregation.fields[].field` | string | 图谱聚合字段名（与 backlinks 聚合结构一致） |
-| `graph.aggregation.fields[].granularity` | string | 图谱聚合日期粒度（可选，同 backlinks） |
-| `graph.aggregation.fields[].order` | int | 图谱聚合字段顺序 |
+| **聚合配置（backlinks / graph 共用同一结构）** | | |
+| `{component}.aggregation.folder.depth` | int | 文件夹聚合深度：`-1`=完整层级, `0`=禁用, 默认 `1` |
+| `{component}.aggregation.folder.flatten` | bool | 是否扁平化深层文件夹，默认 `true` |
+| `{component}.aggregation.fields[].field` | string | 聚合字段名（frontmatter 属性） |
+| `{component}.aggregation.fields[].granularity` | string | 日期字段粒度：`year` \| `month` \| `quarter`（仅 `field: "date"` 时生效） |
+| `{component}.aggregation.fields[].order` | int | 聚合字段显示顺序，值越小越先匹配 |
 
-> **注意**：`graph.aggregation` 与 `backlinks.aggregation` 共享相同的 `fields` 结构，但图谱聚合**只在全局图谱且 `depth: -1` 时生效**，用于将单链接边缘节点按字段值分组。字段值为空的节点不参与聚合。
+> **注意**：`backlinks.aggregation` 与 `graph.aggregation` 共用完全相同的结构（`AggregationConfig`），都包含 `folder` 和 `fields`。配置时按需选用。图谱聚合中，`folder` 按节点文件路径分组，`fields` 按 frontmatter 字段分组，文件夹始终优先于字段聚合。
 
 ### DomainInfo（API 响应结构）
 

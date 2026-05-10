@@ -35,34 +35,37 @@ type QuartzConfig struct {
     Graph     GraphConfig    // 图谱配置
 }
 
-type QuartzLayout struct {
-    Backlinks    BacklinksConfig    // 反向链接配置
-}
-
 type GraphConfig struct {
-    Tags      TagConfig
-    Category  TagConfig
+    Aggregation *AggregationConfig  // 聚合配置（与 backlinks 共用同一结构）
+    ColorBy     string
 }
 
-type TagConfig struct {
-    Color       string
-    DisplayName string
+type AggregationConfig struct {
+    Folder *FolderConfig    `json:"folder,omitempty"`  // 文件夹聚合
+    Fields []FieldConfig    `json:"fields,omitempty"`  // 字段聚合
+}
+
+type FolderConfig struct {
+    Depth   int    // -1=完整层级, 0=禁用, 默认1
+    Flatten bool   // true=扁平化, false=保留层级
+}
+
+type FieldConfig struct {
+    Field      string  // frontmatter 字段名
+    Granularity string // "year", "month", "quarter", 或 ""
+    Order      int     // 聚合优先级（值越小越先匹配）
+}
+
+type QuartzLayout struct {
+    Explorer   ExplorerConfig   // 文件浏览器
+    FolderPage FolderPageConfig // 文件夹页
+    Backlinks  BacklinksConfig  // 反向链接配置
 }
 
 type BacklinksConfig struct {
     HideWhenEmpty bool
-    Aggregation   AggregationConfig
-}
-
-type AggregationConfig struct {
-    Folder  FolderConfig
-    Fields  []FieldConfig
-}
-
-type FieldConfig struct {
-    Field      string
-    Granularity string  // "year", "month", "quarter", 或 ""
-    Order      int
+    Sort          *SortConfig
+    Aggregation   *AggregationConfig
 }
 ```
 
