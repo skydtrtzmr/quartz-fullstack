@@ -61,7 +61,7 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
       "config": {
         "pageTitle": "源悦知识库",
         "baseUrl": "http://127.0.0.1:8766/xm",
-        "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
+        "graph": { "precomputeLocal": false, "localDepth": 1, "fallbackToBfs": false }
       },
       "layout": {
         "backlinks": { "hideWhenEmpty": false, "aggregation": [{ "type": "folder", "depth": 1 }] }
@@ -144,7 +144,7 @@ curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
   "config": {
     "pageTitle": "源悦知识库",
     "baseUrl": "http://127.0.0.1:8766/xm",
-    "graph": { "tags": { "color": "#4a9eff", "displayName": "标签" } }
+    "graph": { "precomputeLocal": false, "localDepth": 1, "fallbackToBfs": false }
   },
     "layout": {
       "backlinks": { "hideWhenEmpty": false, "aggregation": [{ "type": "folder", "depth": 1 }] },
@@ -398,10 +398,9 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 {
   "pageTitle": "源悦知识库",
   "graph": {
-    "tags": {
-      "color": "#4a9eff",
-      "displayName": "标签"
-    }
+    "precomputeLocal": false,
+    "localDepth": 1,
+    "fallbackToBfs": false
   }
 }
 ```
@@ -409,8 +408,9 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `pageTitle` | string | 页面标题/业务域显示名称 |
-| `graph.tags.color` | string | 图谱标签节点颜色 |
-| `graph.tags.displayName` | string | 图谱标签节点显示名 |
+| `graph.precomputeLocal` | boolean | 是否预计算局部图谱（默认 `false`） |
+| `graph.localDepth` | number | 局部图谱深度（默认 `1`） |
+| `graph.fallbackToBfs` | boolean | 是否回退到 BFS 算法（默认 `false`） |
 
 ### quartz.layout.json
 
@@ -435,13 +435,13 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
   "backlinks": {
     "hideWhenEmpty": false,
     "sort": {
-      "type": "natural",
+      "type": "date",
       "order": "desc",
-      "field": ""
+      "field": "date"
     },
     "aggregation": [
       { "type": "folder", "depth": 1 },
-      { "type": "field", "field": "date", "granularity": "year" },
+      { "type": "date", "field": "date", "granularity": "year" },
       { "type": "field", "field": "type" }
     ]
   },
@@ -458,7 +458,7 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 |------|------|------|
 | `explorer.sort.type` | string | 文件浏览器排序方式：`natural` \| `lexical` \| `date` \| `numeric` |
 | `explorer.sort.order` | string | 排序方向：`asc` \| `desc` |
-| `explorer.sort.field` | string | 排序字段名（前端 JS 属性名） |
+| `explorer.sort.field` | string | 排序字段名（frontmatter 属性名） |
 | `folderPage.sort.*` | - | 文件夹页面排序（字段同 explorer.sort） |
 | `backlinks.hideWhenEmpty` | bool | 无反向链接时是否隐藏组件 |
 | `backlinks.sort.*` | - | 反向链接排序（可选，字段同 explorer.sort） |
@@ -468,6 +468,12 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 | `{component}.aggregation[].field` | string | 字段名（`field`/`date` 用，`folder` 可省略） |
 | `{component}.aggregation[].depth` | int | 文件夹截取深度（仅 `folder` 有效，默认 `1`） |
 | `{component}.aggregation[].granularity` | string | 日期粒度：`year` \| `month` \| `quarter`（仅 `date` 有效） |
+
+**排序字段来源**：`sort.field` 对应 Markdown 文件 frontmatter 中的属性名。例如 `"field": "priority"` 表示按 `priority` 字段排序；`"field": "date"` 表示按 `date` 字段排序。该字段在页面渲染时**不会显示**，仅用于排序计算。
+
+**排序值相同时的处理（Tie-Breaker）**：当两个文件的主排序字段值相同时，系统会**隐式使用 `title` 的自然排序（natural asc）作为二次排序**。`title` 通常与文件名一致，因此可理解为"按文件名的自然升序"作为兜底规则。
+
+**不同文件夹使用不同排序逻辑**：`quartz.layout.json` 中的排序配置是全局的，但不同文件夹可以通过在各自文件的 frontmatter 中设置**同一排序字段的不同值**来实现差异化排序效果。例如全局配置 `"field": "priority"`，项目文件夹下的文件设置 `priority: 1, 2, 3...`，任务文件夹下的文件也设置各自的 `priority` 值，各自文件夹内即按该字段独立排序。
 
 > **注意**：`backlinks.aggregation` 与 `graph.aggregation` 共用完全相同的结构（`AggregationConfig`），均为规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。不再使用 `order` 字段，也不再区分 `folder` 和 `fields` 两个独立配置块。
 
