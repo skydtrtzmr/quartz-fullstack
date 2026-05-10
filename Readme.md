@@ -1,6 +1,6 @@
 # Quartz 全栈项目
 
-包含客户端（Quartz 前端引擎）与服务端（Go 构建调度服务）。
+包含**客户端**与**服务端**。
 
 核心设计理念是**“前端引擎层”与“业务数据层”的解耦**：通过统一的后端调度，配合前端支持动态参数，实现一套 Quartz 代码支持无限个独立业务域的站点构建。
 
@@ -8,35 +8,17 @@
 
 ## 项目文件夹结构
 
-```
-quartz-fullstack/
-├── client/                 # (源码) Quartz 前端引擎，负责 Markdown 解析与静态站点生成
-│   └── quartz/             # 核心引擎代码
-│
-├── server/                 # (源码) Go 后端服务，负责接口路由与构建任务调度
-│   └── config.json         # 预设运行文件夹的绝对路径基础值
-│
-├── input/                  # (数据) 业务 Markdown 源文件根目录
-│   ├── xm/                 # domain: xm 的文档中心
-│   └── docs/               # domain: docs 的文档中心
-│   └── .gitkeep            # 保留空目录占位
-│
-├── settings/               # (数据) 各业务域的覆写配置
-│   ├── xm/
-│   │   ├── quartz.config.json   # 主题、标题等配置
-│   │   └── quartz.layout.json   # 排序策略、分布选项等
-│   └── docs/
-│
-├── output/                 # (结果) 构建产物根目录
-│   ├── xm/
-│   │   └── public/         # 静态 HTML（最终 serve 的目录）
-│   └── docs/
-│   └── .gitkeep            # 保留空目录占位
-│
-├── scripts/                # 辅助脚本（如项目打包）
-├── bruno-api-test/         # API 测试集合
-└── Readme.md
-```
+| 名称 | 作用 | 主要文件 / 子目录 |
+|:---|:---|:---|
+| `client/` | Quartz 前端引擎，负责 Markdown 解析与静态站点生成 | `quartz/`（核心引擎代码） |
+| `server/` | Go 后端服务，负责接口路由与构建任务调度 | `config.json`、Go 源码等 |
+| `input/` | 业务 Markdown 源文件根目录，按业务域分子目录 | 各域 Markdown 文件 |
+| `settings/` | 各业务域的覆写配置 | `quartz.config.json`、`quartz.layout.json` |
+| `output/` | 构建产物根目录，按业务域分子目录 | `public/`（静态 HTML） |
+| `scripts/` | 辅助脚本（如项目打包） | Python / Shell 脚本等 |
+| `bruno-api-test/` | API 测试集合 | `*.bru` 测试用例 |
+| `document/` | 项目文档说明 | `*.md`、`*.json` 示例与说明 |
+| `logs/` | 运行日志目录 | `tasks/` |
 
 ### 目录与参数映射关系
 

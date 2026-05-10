@@ -1,9 +1,9 @@
 {
+  "baseUrl": "http://127.0.0.1:8766/example",
   "pageTitle": "示例知识库",
   "graph": {
-    "tags": {
-      "color": "#4a9eff",
-      "displayName": "标签"
-    }
+    "precomputeLocal": true,
+    "localDepth": 1,
+    "fallbackToBfs": true
   }
 }

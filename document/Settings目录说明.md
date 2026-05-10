@@ -44,6 +44,26 @@ server/examples/settings/
 
 `backlinks.aggregation` 和 `graph.aggregation` 使用**完全相同的结构**（`AggregationConfig`），均为 `AggregationRule[]` 规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。
 
+### 为什么聚合用列表，排序不用列表？
+
+聚合和排序的设计目标不同，因此配置方式也不同：
+
+| | 聚合 | 排序 |
+|:---|:---|:---|
+| **作用** | 分组（树形结构） | 排列（线性顺序） |
+| **执行方式** | 多级嵌套，逐级过滤 | 单一标准，一次决定 |
+| **多规则结果** | 有意义的层级结构 | 会导致语义混乱 |
+
+聚合天然可以多级（先按客户分，再按类型分），所以用规则列表。排序只需要一个标准，多键排序会让配置和实现都变得复杂且难以预期。如需局部调整排序，可在对应 `index.md` 或文件的 frontmatter 中设置排序相关属性（如 `order`、`date` 等）。
+
+### 排序配置
+
+| 字段 | 说明 |
+|------|------|
+| `{component}.sort.type` | 排序方式：`natural` \| `lexical` \| `date` \| `numeric` |
+| `{component}.sort.order` | 排序方向：`asc` \| `desc` |
+| `{component}.sort.field` | 排序字段名（frontmatter 属性名） |
+
 ## 创建新业务域
 
 ### 方式一：通过 API（推荐）
