@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: 127.0.0.1:8766/api/domain/testwork/build?user=admin&pwd=password123&reset=true
+  url: 127.0.0.1:8766/api/domain/testwork/build?user=admin&pwd=password123
   body: none
   auth: inherit
 }
@@ -13,7 +13,7 @@ post {
 params:query {
   user: admin
   pwd: password123
-  reset: true
+  ~reset: true
 }
 
 vars:pre-request {

@@ -1,0 +1,46 @@
+{
+  "explorer": {
+    "sort": {
+      "type": "natural",
+      "order": "asc",
+      "field": "title"
+    }
+  },
+  "folderPage": {
+    "sort": {
+      "type": "date",
+      "order": "desc",
+      "field": "date"
+    }
+  },
+  "backlinks": {
+    "hideWhenEmpty": false,
+    "sort": {
+      "type": "date",
+      "order": "desc",
+      "field": "date"
+    },
+    "aggregation": {
+      "folder": {
+        "depth": 1,
+        "flatten": false
+      },
+      "fields": [
+        { "field": "date", "granularity": "year", "order": 1 },
+        { "field": "type", "order": 2 }
+      ]
+    }
+  },
+  "graph": {
+    "aggregation": {
+      "folder": {
+        "depth": 1,
+        "flatten": true
+      },
+      "fields": [
+        { "field": "tags", "order": 1 },
+        { "field": "type", "order": 2 }
+      ]
+    }
+  }
+}

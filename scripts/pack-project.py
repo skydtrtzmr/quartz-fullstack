@@ -32,7 +32,8 @@ EXCLUDE_PATTERNS = [
     "scripts/*",
     ".gitignore",
     ".gitmodules",
-    "*.zip"
+    "*.zip",
+    "public/*"
 ]
 
 # 保留的文件（即使匹配排除规则）
