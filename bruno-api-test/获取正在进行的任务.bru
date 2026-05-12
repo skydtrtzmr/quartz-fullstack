@@ -1,11 +1,11 @@
 meta {
-  name: 获取任务
+  name: 获取正在进行的任务
   type: http
   seq: 9
 }
 
 get {
-  url: 127.0.0.1:8766/api/domain/tasks?user=admin&pwd=password123
+  url: 127.0.0.1:8766/api/tasks?user=admin&pwd=password123
   body: none
   auth: inherit
 }

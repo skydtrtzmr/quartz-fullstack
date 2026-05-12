@@ -340,7 +340,124 @@ curl "http://127.0.0.1:8766/api/domain/xm/logs?user=admin&pwd=password123"
 
 ---
 
-### 4. 传统构建端点（兼容）
+### 4. 获取所有运行中的任务
+
+```
+GET /api/tasks
+```
+
+获取当前所有正在运行的构建任务列表。
+
+**请求示例**：
+```bash
+curl "http://127.0.0.1:8766/api/tasks?user=admin&pwd=password123"
+```
+
+**响应**：
+```json
+{
+  "count": 2,
+  "tasks": [
+    {
+      "domain": "xm",
+      "taskId": "xm-20260512-222900",
+      "startTime": "2026-05-12T22:29:00+08:00",
+      "reset": false,
+      "command": "node ./quartz/bootstrap-cli.mjs build ...",
+      "logPath": "logs/tasks/task-xm-20260512-222900.log"
+    },
+    {
+      "domain": "xm1",
+      "taskId": "xm1-20260512-223100",
+      "startTime": "2026-05-12T22:31:00+08:00",
+      "reset": true,
+      "command": "...",
+      "logPath": "..."
+    }
+  ]
+}
+```
+
+**响应字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `count` | int | 正在运行的任务数量 |
+| `tasks[].domain` | string | 业务域名称 |
+| `tasks[].taskId` | string | 任务唯一标识（格式：`{domain}-{timestamp}`） |
+| `tasks[].startTime` | string | RFC3339 格式的开始时间 |
+| `tasks[].reset` | bool | 是否为 reset（全量）构建 |
+| `tasks[].command` | string | 执行的完整命令 |
+| `tasks[].logPath` | string | 任务日志文件路径 |
+
+---
+
+### 5. Output 目录清理
+
+```
+GET  /api/output/cleanup     # 干运行模式：只列出垃圾文件，不删除
+POST /api/output/cleanup     # 确认删除（需带 confirm=true 参数）
+```
+
+清理 `output/` 目录中的孤立子目录（不在 `settings/` 目录列表中的条目视为垃圾）。
+
+**查询参数**：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `confirm` | boolean | 设为 `true` 时执行实际删除，设为其他值或省略时为干运行 |
+
+**请求示例**：
+```bash
+# 干运行：列出垃圾文件（不删除）
+curl "http://127.0.0.1:8766/api/output/cleanup?user=admin&pwd=password123"
+
+# 确认删除
+curl -X POST "http://127.0.0.1:8766/api/output/cleanup?user=admin&pwd=password123&confirm=true"
+```
+
+**响应**（干运行）：
+```json
+{
+  "status": "dryrun",
+  "count": 2,
+  "garbage": [
+    "output/orphan_dir1",
+    "output/orphan_dir2"
+  ],
+  "message": "Dry run: found 2 garbage items (no deletion performed)"
+}
+```
+
+**响应**（确认删除）：
+```json
+{
+  "status": "deleted",
+  "count": 2,
+  "deleted": [
+    "output/orphan_dir1",
+    "output/orphan_dir2"
+  ],
+  "message": "Deleted 2 garbage items"
+}
+```
+
+**响应**（有任务运行中）：
+```json
+{
+  "error": "Task(s) running, cleanup denied"
+}
+```
+
+**说明**：
+- 清理规则：只删除 `output/` 下的孤立子目录
+- 孤立目录 = 不在 `settings/` 目录子目录列表中的条目
+- 忽略规则（不会被删除）：`.gitkeep` 文件、以 `.` 开头的隐藏文件/目录
+- 有任何构建任务运行时，拒绝执行清理操作
+
+---
+
+### 6. 传统构建端点（兼容）
 
 ```
 POST /api/build
@@ -703,5 +820,5 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1/build?user=admin&pwd=password
 
 ---
 
-**文档版本**: v3.0
-**更新日期**: 2026-04-19
+**文档版本**: v3.1
+**更新日期**: 2026-05-12
