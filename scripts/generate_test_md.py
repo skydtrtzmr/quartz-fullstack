@@ -149,13 +149,14 @@ LAYOUT_TEMPLATES = {
     }
 }
 
+# 在这里修改生成业务域的默认配置！
 DEFAULT_CONFIG = {
     "pageTitle": "",
     "baseUrl": "",
     "graph": {
-        "precomputeLocal": False,
+        "precomputeLocal": True,
         "localDepth": 1,
-        "fallbackToBfs": False
+        "fallbackToBfs": True
     }
 }
 

@@ -10,3 +10,5 @@ python scripts/generate_test_md.py --domain demo-region --profile region --clean
 # 打包
 
 python .\scripts\pack-project.py
+
+注意，此脚本包含生成业务域配置文件。
