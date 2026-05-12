@@ -19,7 +19,7 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 OUT_FILE = PROJECT_ROOT / f"quartz-fullstack-{timestamp}.zip"
 
-# 排除模式（基于 fnmatch）
+# 排除模式（基于 fnmatch，仅匹配根目录）
 EXCLUDE_PATTERNS = [
     "node_modules",
     ".spec",
@@ -28,6 +28,7 @@ EXCLUDE_PATTERNS = [
     "*.log",
     ".git",
     ".claude",
+    "scripts/*",      # 仅排除根目录的 scripts/
     ".gitignore",
     ".gitmodules",
     "*.zip",
@@ -43,15 +44,12 @@ INCLUDE_PATTERNS = [
 
 
 def matches_pattern(relative_path: str, pattern: str) -> bool:
-    """检查相对路径是否匹配给定的模式。"""
+    """检查相对路径是否匹配给定的模式（仅从根目录开始匹配）。"""
     import fnmatch
-
-    # 支持多种匹配方式
+    # 只需匹配根目录下的路径：settings/xxx 或 settings
     patterns = [
-        f"*/{pattern}/*",
-        f"{pattern}/*",
-        f"*/{pattern}",
-        pattern,
+        f"{pattern}/*",   # settings/xxx
+        f"{pattern}",     # settings 本身
     ]
     return any(fnmatch.fnmatch(relative_path, p) for p in patterns)
 
