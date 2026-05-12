@@ -27,6 +27,13 @@
     ]
   },
   "graph": {
+    "coreNodeFilter": [
+      { "type": "folder", "depth": 1, "values": ["组织"] }
+    ],
+    "coreNodeLimit": 50,
+    "regionRules": [
+      { "type": "field", "field": "客户" }
+    ],
     "aggregation": [
       { "type": "folder", "depth": 1 },
       { "type": "field", "field": "tags" },

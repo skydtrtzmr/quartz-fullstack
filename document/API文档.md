@@ -412,6 +412,56 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 | `graph.localDepth` | number | 局部图谱深度（默认 `1`） |
 | `graph.fallbackToBfs` | boolean | 是否回退到 BFS 算法（默认 `false`） |
 
+### quartz.layout.json（图谱扩展字段）
+
+**注意**：`quartz.config.json` 与 `quartz.layout.json` 的变更**不会被增量构建自动识别**。修改后必须带 `reset=true` 触发全量重新构建，否则页面中嵌入的配置不会更新。
+
+```json
+{
+  "graph": {
+    "coreNodeFilter": [
+      { "type": "folder", "depth": 1, "values": ["组织"] },
+      { "type": "field", "field": "type", "values": ["项目", "组织"] }
+    ],
+    "coreNodeLimit": 50,
+    "regionRules": [
+      { "type": "field", "field": "客户" },
+      { "type": "folder", "depth": 2 }
+    ],
+    "aggregation": [
+      { "type": "folder", "depth": 1 },
+      { "type": "field", "field": "type" }
+    ]
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `graph.coreNodeFilter` | `CoreNodeFilterRule[]` | **全局图谱**核心节点筛选规则，满足任一规则即为核心节点（OR 关系）。未配置时回退到连接数阈值 |
+| `graph.coreNodeFilter[].type` | string | 规则类型：`folder`（按路径文件夹匹配）\| `field`（按 frontmatter 字段匹配） |
+| `graph.coreNodeFilter[].field` | string | 字段名（仅 `field` 类型有效） |
+| `graph.coreNodeFilter[].depth` | number | 文件夹截取深度（仅 `folder` 类型有效，默认 `1`） |
+| `graph.coreNodeFilter[].values` | string[] | 精确匹配值列表，满足任一值即命中 |
+| `graph.coreNodeLimit` | number | **全局图谱**核心节点数量硬上限。超过时按连接数降序截取前 N 个。默认 `100` |
+| `graph.regionRules` | `AggregationRule[]` | **全局图谱**大区聚合规则。配置后首屏先显示大区节点，点击展开才显示内部核心节点。不配置则保持现有行为 |
+| `graph.expandCoresOnRegionOpen` | `boolean` | 大区展开后是否同时展开内部核心节点。`true`（默认）时核心节点的边缘节点一并展开；`false` 时核心节点保持收起，需逐个点击展开 |
+| `graph.aggregation` | `AggregationRule[]` | 叶节点聚合规则，对核心节点的单归属边缘节点按规则分组为聚合节点 |
+
+**coreNodeFilter 匹配示例**：
+- `{ "type": "folder", "depth": 1, "values": ["组织"] }`：slug 第一级文件夹为 `"组织"` 的节点标记为核心节点
+- `{ "type": "field", "field": "type", "values": ["项目", "组织"] }`：frontmatter.type 为 `"项目"` 或 `"组织"` 的节点标记为核心节点
+
+**regionRules 大区聚合示例**：
+- `{ "type": "field", "field": "客户" }`：按 frontmatter.客户 的值把核心节点分组为 "A客户"、"B客户" 等大区
+- `{ "type": "folder", "depth": 2 }`：按 slug 路径第2级文件夹分组
+
+> **注意**：`regionRules` 虽然为列表格式，但**当前实现只读取第一条规则**，其余规则会被忽略。如需更换分组维度，直接修改列表中的第一个元素即可。保留列表格式是为将来可能的“大区 → 子区”多级分组预留扩展。
+
+> 大区聚合仅作用于**全局图谱**。首屏只显示大区节点和跨区共享文件，点击大区节点展开后才显示内部核心节点及其叶节点聚合。不配置 `regionRules` 时保持现有行为（直接显示核心节点）。
+
+---
+
 ### quartz.layout.json
 
 **所有字段均为可选**，不传则使用前端默认值。反向链接和图谱**共用同一 `AggregationConfig` 结构**，均为 `AggregationRule[]` 规则列表，按数组顺序执行。

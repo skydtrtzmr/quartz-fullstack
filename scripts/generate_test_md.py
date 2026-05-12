@@ -143,10 +143,10 @@ def build_frontmatter_lines(title: str, folder_name: str, extra_fields: dict) ->
         else:
             lines.append(f'tags: ["' + '", "'.join(tags) + '"]')
 
-    # extra_fields（引用关系字段）
+    # extra_fields（引用关系字段，值使用 [[wikilink]] 格式）
     for k, v in extra_fields.items():
-        if v is not None:
-            lines.append(f'{k}: "{v}"')
+        if v is not None and not isinstance(v, list):
+            lines.append(f'{k}: "[[{v}]]"')
 
     lines.append("---")
     return lines
@@ -156,7 +156,7 @@ def build_content(title: str, body_links: list[str]) -> str:
     paragraphs = random.sample(LOREM_SENTENCES, k=random.randint(2, 4))
     body = "\n\n".join(paragraphs)
 
-    # 在正文末尾添加 wikilink 引用段落
+    # 正文中添加 wikilink 引用段落（用于多值关联等不适合 frontmatter 单值的情况）
     if body_links:
         link_sentences = []
         for link in body_links:
@@ -244,13 +244,11 @@ def main():
     for rec in person_records:
         org_file = maybe(random.choice(org_filenames), MISSING_RATE["organization"])
         extra = {}
-        body_links = []
         if org_file:
             org_name = org_file.replace(".md", "")
-            extra["organization"] = org_name
-            body_links.append(org_name)
+            extra["组织"] = org_name
         frontmatter = build_frontmatter_lines(rec["title"], "人员", extra)
-        body = build_content(rec["title"], body_links)
+        body = build_content(rec["title"], [])
         with open(os.path.join(person_path, rec["filename"]), "w", encoding="utf-8") as f:
             f.write("\n".join(frontmatter))
             f.write("\n\n")
@@ -264,12 +262,11 @@ def main():
     for rec in proj_records:
         owner_file = maybe(random.choice(person_filenames), MISSING_RATE["owner"])
         extra = {}
-        body_links = []
         if owner_file:
             owner_name = owner_file.replace(".md", "")
-            extra["owner"] = owner_name
-            body_links.append(owner_name)
-        # 再随机引用 1-2 个参与人员
+            extra["负责人"] = owner_name
+        # 再随机引用 1-2 个参与人员（放入正文）
+        body_links = []
         participant_count = random.randint(0, 2)
         for _ in range(participant_count):
             p = random.choice(person_filenames).replace(".md", "")
@@ -290,12 +287,11 @@ def main():
     for rec in task_records:
         proj_file = maybe(random.choice(proj_filenames), MISSING_RATE["project"])
         extra = {}
-        body_links = []
         if proj_file:
             proj_name = proj_file.replace(".md", "")
-            extra["project"] = proj_name
-            body_links.append(proj_name)
-        # 再随机引用 0-1 个关联人员
+            extra["项目"] = proj_name
+        # 再随机引用 0-1 个关联人员（放入正文）
+        body_links = []
         if random.random() < 0.3:
             p = random.choice(person_filenames).replace(".md", "")
             body_links.append(p)
@@ -319,22 +315,20 @@ def main():
         if random.random() < 0.5:
             proj_file = random.choice(proj_filenames)
             proj_name = proj_file.replace(".md", "")
-            extra["project"] = proj_name
-            body_links.append(proj_name)
+            extra["项目"] = proj_name
 
         # 关联任务
         if random.random() < 0.6:
             task_file = random.choice(task_filenames)
             task_name = task_file.replace(".md", "")
-            extra["task"] = task_name
-            body_links.append(task_name)
+            extra["任务"] = task_name
 
         # 关联人员（提问者/回答者）
         if random.random() < 0.4:
             p = random.choice(person_filenames).replace(".md", "")
-            body_links.append(p)
+            extra["相关人员"] = p
 
-        # 额外随机引用（确保有足够链接密度）
+        # 额外随机引用（放入正文，确保有足够链接密度）
         extra_refs = random.randint(0, 2)
         all_candidates = proj_filenames + task_filenames + person_filenames
         for _ in range(extra_refs):

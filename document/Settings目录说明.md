@@ -41,6 +41,12 @@ server/examples/settings/
 | `{component}.aggregation[].field` | 字段名（`field`/`date` 用，`folder` 可省略） |
 | `{component}.aggregation[].depth` | 文件夹截取深度（仅 `folder` 有效） |
 | `{component}.aggregation[].granularity` | 日期粒度：`year` \| `month` \| `quarter`（仅 `date` 有效） |
+| **图谱专属字段** | | |
+| `graph.coreNodeFilter` | `CoreNodeFilterRule[]` | **全局图谱**核心节点筛选规则（OR 关系） |
+| `graph.coreNodeLimit` | number | **全局图谱**核心节点数量硬上限（默认 `100`） |
+| `graph.regionRules` | `AggregationRule[]` | **全局图谱**大区聚合规则。配置后首屏先显示大区节点。注意：当前实现**只取列表中第一条规则**，其余规则会被忽略 |
+| `graph.expandCoresOnRegionOpen` | `boolean` | 大区展开后是否同时展开内部核心节点。`true`（默认）时核心节点的边缘节点一并展开；`false` 时核心节点保持收起，需逐个点击展开 |
+| `graph.aggregation` | `AggregationRule[]` | 叶节点聚合规则，对核心节点的单归属边缘节点分组 |
 
 `backlinks.aggregation` 和 `graph.aggregation` 使用**完全相同的结构**（`AggregationConfig`），均为 `AggregationRule[]` 规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。
 

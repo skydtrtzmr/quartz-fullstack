@@ -47,6 +47,8 @@
    > **注意**：`--cacheDir` 参数必须显式传入，否则 SQLite 缓存文件会默认生成在 `--settings` 指定的目录下。
 4. **引擎处理**：`build.ts` 恢复增量 SQLite 缓存，`quartz.config.ts` 与 `quartz.layout.ts` 动态合并配置，编译后输出到指定目录。
 
+> **重要**：增量构建仅检测 `input/` 目录下 Markdown 文件的变更。若修改了 `quartz.config.json` 或 `quartz.layout.json` 等配置文件，由于这些变更不会被识别为需要重建页面的原因，**必须带 `--reset` 参数触发全量重新构建**，否则页面中嵌入的配置（如图谱参数）不会更新。
+
 ### 静态资源路由
 
 当用户访问 `http://ip:port/xm/index.html` 时：
