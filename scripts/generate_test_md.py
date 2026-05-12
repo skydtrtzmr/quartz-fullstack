@@ -249,11 +249,46 @@ def generate_index_md(folder_path: str, folder_name: str):
 def generate_root_index_md(target_dir: str, domain: str):
     """生成根目录的 index.md（Quartz 首页入口）"""
     filepath = os.path.join(target_dir, "index.md")
+    
+    # 计算统计
+    total = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
+    
     # 各分类的文件夹链接
     folder_links = []
     for cfg in FOLDER_CONFIGS:
         folder_name = cfg["name"]
-        folder_links.append(f"- [[{folder_name}]]")
+        count = cfg["count"]
+        folder_links.append(f"- [[{folder_name}]] ({count} files)")
+    
+    # 文件数量分布表格
+    folder_stats_lines = []
+    for cfg in FOLDER_CONFIGS:
+        folder_name = cfg["name"]
+        count = cfg["count"]
+        pct = (count / total * 100) if total > 0 else 0
+        bar_len = int(pct / 5)  # 每5%一个字符
+        bar = "█" * bar_len + "░" * (20 - bar_len)
+        folder_stats_lines.append(f"| {folder_name} | {count:>6} | {pct:>5.1f}% | `{bar}` |")
+    
+    # 文件树（使用配置的 count 来生成）
+    tree_lines = []
+    for cfg in FOLDER_CONFIGS:
+        folder_name = cfg["name"]
+        prefix = cfg["prefix"]
+        count = cfg["count"]
+        tree_lines.append(f"{folder_name}/")
+        tree_lines.append(f"├── index.md")
+        # 根据数量决定显示方式
+        if count > 7:
+            for i in range(1, 4):
+                tree_lines.append(f"├── {prefix}-{i:05d}.md")
+            tree_lines.append(f"├── ... ({count - 6} more files) ...")
+            for i in range(count - 2, count + 1):
+                tree_lines.append(f"└── {prefix}-{i:05d}.md")
+        else:
+            for i in range(1, count + 1):
+                prefix_char = "└── " if i == count else "├── "
+                tree_lines.append(f"{prefix_char}{prefix}-{i:05d}.md")
 
     content = f"""---
 title: "{domain}"
@@ -261,11 +296,29 @@ title: "{domain}"
 
 # {domain}
 
-Welcome to {domain}.
+## 统计概览
+
+| 指标 | 值 |
+|------|-----|
+| 总文件数 | {total} |
+| 分类数量 | {len(FOLDER_CONFIGS)} |
+
+## 文件分布
+
+| 分类 | 文件数 | 占比 | 可视化 |
+|------|--------|------|--------|
+{chr(10).join(folder_stats_lines)}
 
 ## 分类目录
 
 {chr(10).join(folder_links)}
+
+## 文件树
+
+```
+.
+{chr(10).join(tree_lines)}
+```
 
 ## 功能说明
 
