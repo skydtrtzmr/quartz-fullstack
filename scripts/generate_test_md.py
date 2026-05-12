@@ -23,9 +23,9 @@ from datetime import datetime, timedelta
 
 # 数量分布：组织 < 人员 < 项目 < 任务 < 问答
 FOLDER_CONFIGS = [
-    {"name": "组织", "prefix": "org",   "count": 200},
+    {"name": "组织", "prefix": "org",   "count": 400},
     {"name": "人员", "prefix": "person","count": 2000},
-    {"name": "项目", "prefix": "proj",  "count": 400},
+    {"name": "项目", "prefix": "proj",  "count": 600},
     {"name": "任务", "prefix": "task",  "count": 7000},
     {"name": "问答", "prefix": "qa",    "count": 10000},
 ]
@@ -246,6 +246,44 @@ def generate_index_md(folder_path: str, folder_name: str):
     print(f"  [index] {filepath}")
 
 
+def generate_root_index_md(target_dir: str, domain: str):
+    """生成根目录的 index.md（Quartz 首页入口）"""
+    filepath = os.path.join(target_dir, "index.md")
+    # 各分类的文件夹链接
+    folder_links = []
+    for cfg in FOLDER_CONFIGS:
+        folder_name = cfg["name"]
+        folder_links.append(f"- [[{folder_name}]]")
+
+    content = f"""---
+title: "{domain}"
+---
+
+# {domain}
+
+Welcome to {domain}.
+
+## 分类目录
+
+{chr(10).join(folder_links)}
+
+## 功能说明
+
+本文档用于测试 Quartz 构建系统的以下功能：
+
+- **排序**：支持自然排序、字典序、日期排序、数值排序
+- **聚合**：支持按文件夹、字段、日期等多种维度分组
+- **反向链接**：自动收集引用当前文档的其他文档
+- **图谱**：可视化文档间的关联关系
+
+---
+*此文件由自动生成，请勿手动修改*
+"""
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"  [index] {filepath}")
+
+
 def write_domain_config(project_root: str, domain: str, profile: str):
     """生成业务域的配置文件"""
     settings_dir = os.path.join(project_root, "settings", domain)
@@ -294,6 +332,9 @@ def generate_domain(project_root: str, domain: str, profile: str, clean: bool):
 
     os.makedirs(target_dir, exist_ok=True)
     print(f"[target] {target_dir}")
+
+    # ========== 生成根目录 index.md（Quartz 首页） ==========
+    generate_root_index_md(target_dir, domain)
 
     # ========== 第一阶段：生成所有文件，记录文件名 ==========
     all_files = {}  # folder_name -> [filename, ...]
@@ -443,7 +484,8 @@ def generate_domain(project_root: str, domain: str, profile: str, clean: bool):
     print(f"  [done] 问答: {len(qa_records)} files")
 
     total = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
-    print(f"[summary] 共生成 {total} 个 Markdown 文件（含 {len(FOLDER_CONFIGS)} 个 index.md）")
+    index_count = len(FOLDER_CONFIGS) + 1  # 各子目录 + 根目录
+    print(f"[summary] 共生成 {total} 个 Markdown 文件（含 {index_count} 个 index.md: {index_count-1} 个子目录 + 1 个根目录）")
     print(f"[summary] 目标目录: {target_dir}")
 
 
