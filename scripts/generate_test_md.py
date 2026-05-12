@@ -2,10 +2,11 @@
 """
 批量生成测试 Markdown 文件（含 Obsidian 风格 wikilink 引用关系）
 
-用途：在 input/testgen/ 下生成 2 万个测试文件，覆盖排序、聚合、反向链接、图谱等功能验证。
+用途：在 input/{domain}/ 下生成测试文件，覆盖排序、聚合、反向链接、图谱等功能验证。
 
 执行方式：
-    python scripts/generate_test_md.py
+    python scripts/generate_test_md.py --domain demo-region --profile region
+    python scripts/generate_test_md.py --domain demo-core --profile core
 
 可选参数：
     --clean    清空目标目录后重新生成
@@ -14,11 +15,11 @@
 import os
 import random
 import argparse
+import shutil
+import json
 from datetime import datetime, timedelta
 
 # ============ 配置 ============
-
-TARGET_DOMAIN = "testgen"
 
 # 数量分布：组织 < 人员 < 项目 < 任务 < 问答
 FOLDER_CONFIGS = [
@@ -92,6 +93,71 @@ LOREM_SENTENCES = [
     "建议在实际使用前，先用测试数据集验证配置是否符合预期。",
     "本文档由自动化脚本生成，仅用于功能测试和性能基准测试。",
 ]
+
+# 两个业务域的 layout 配置模板
+LAYOUT_TEMPLATES = {
+    "region": {
+        "explorer": {
+            "sort": {"type": "natural", "order": "asc", "field": ""}
+        },
+        "folderPage": {
+            "sort": {"type": "natural", "order": "asc", "field": ""}
+        },
+        "backlinks": {
+            "hideWhenEmpty": False,
+            "aggregation": [
+                {"type": "folder", "depth": 1},
+                {"type": "field", "field": "type"},
+                {"type": "date", "field": "date", "granularity": "year"}
+            ]
+        },
+        "graph": {
+            "coreNodeFilter": [
+                {"type": "folder", "depth": 1, "values": ["项目"]}
+            ],
+            "coreNodeLimit": 50,
+            "regionRules": [{"type": "field", "field": "type"}],
+            "aggregation": [
+                {"type": "folder", "depth": 1},
+                {"type": "field", "field": "type"},
+                {"type": "date", "field": "date", "granularity": "year"}
+            ]
+        }
+    },
+    "core": {
+        "explorer": {
+            "sort": {"type": "date", "order": "desc", "field": "date"}
+        },
+        "folderPage": {
+            "sort": {"type": "date", "order": "desc", "field": "date"}
+        },
+        "backlinks": {
+            "hideWhenEmpty": False,
+            "sort": {"type": "priority", "order": "desc", "field": "priority"},
+            "aggregation": [
+                {"type": "folder", "depth": 1},
+                {"type": "field", "field": "status"}
+            ]
+        },
+        "graph": {
+            "coreNodeLimit": 30,
+            "aggregation": [
+                {"type": "folder", "depth": 1},
+                {"type": "field", "field": "status"}
+            ]
+        }
+    }
+}
+
+DEFAULT_CONFIG = {
+    "pageTitle": "",
+    "baseUrl": "",
+    "graph": {
+        "precomputeLocal": False,
+        "localDepth": 1,
+        "fallbackToBfs": False
+    }
+}
 
 
 def random_date() -> str:
@@ -180,19 +246,51 @@ def generate_index_md(folder_path: str, folder_name: str):
     print(f"  [index] {filepath}")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="批量生成测试 Markdown 文件")
-    parser.add_argument("--clean", action="store_true", help="清空目标目录后重新生成")
-    args = parser.parse_args()
+def write_domain_config(project_root: str, domain: str, profile: str):
+    """生成业务域的配置文件"""
+    settings_dir = os.path.join(project_root, "settings", domain)
+    os.makedirs(settings_dir, exist_ok=True)
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-    target_dir = os.path.join(project_root, "input", TARGET_DOMAIN)
+    # quartz.layout.json
+    layout = LAYOUT_TEMPLATES.get(profile, LAYOUT_TEMPLATES["region"])
+    layout_path = os.path.join(settings_dir, "quartz.layout.json")
+    with open(layout_path, "w", encoding="utf-8") as f:
+        json.dump(layout, f, ensure_ascii=False, indent=2)
+    print(f"  [config] {layout_path}")
 
-    if args.clean and os.path.exists(target_dir):
-        import shutil
-        print(f"[clean] 删除 {target_dir}")
+    # quartz.config.json
+    config = dict(DEFAULT_CONFIG)
+    config["pageTitle"] = domain
+    config["baseUrl"] = f"http://127.0.0.1:8766/{domain}"
+    config_path = os.path.join(settings_dir, "quartz.config.json")
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    print(f"  [config] {config_path}")
+
+
+def clean_old_domains(project_root: str, keep_domains: set):
+    """清理 input、output、settings 下的旧业务域"""
+    for base in ["input", "output", "settings"]:
+        base_dir = os.path.join(project_root, base)
+        if not os.path.exists(base_dir):
+            continue
+        for name in os.listdir(base_dir):
+            if name not in keep_domains:
+                path = os.path.join(base_dir, name)
+                if os.path.isdir(path):
+                    try:
+                        shutil.rmtree(path)
+                        print(f"[clean] 删除 {path}")
+                    except PermissionError:
+                        print(f"[skip] 权限不足，跳过删除 {path}")
+
+
+def generate_domain(project_root: str, domain: str, profile: str, clean: bool):
+    target_dir = os.path.join(project_root, "input", domain)
+
+    if clean and os.path.exists(target_dir):
         shutil.rmtree(target_dir)
+        print(f"[clean] 删除 {target_dir}")
 
     os.makedirs(target_dir, exist_ok=True)
     print(f"[target] {target_dir}")
@@ -347,6 +445,30 @@ def main():
     total = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
     print(f"[summary] 共生成 {total} 个 Markdown 文件（含 {len(FOLDER_CONFIGS)} 个 index.md）")
     print(f"[summary] 目标目录: {target_dir}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="批量生成测试 Markdown 文件")
+    parser.add_argument("--domain", type=str, required=True, help="业务域名称，如 demo-region")
+    parser.add_argument("--profile", type=str, choices=["region", "core"], required=True,
+                        help="配置模板：region（大区模式）或 core（硬上限模式）")
+    parser.add_argument("--clean", action="store_true", help="清空目标目录后重新生成")
+    parser.add_argument("--clean-all", action="store_true",
+                        help="清理所有旧业务域，只保留当前指定的业务域")
+    args = parser.parse_args()
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+
+    # 清理所有旧业务域
+    if args.clean_all:
+        clean_old_domains(project_root, keep_domains={args.domain})
+
+    # 生成配置文件
+    write_domain_config(project_root, args.domain, args.profile)
+
+    # 生成 Markdown 文件
+    generate_domain(project_root, args.domain, args.profile, args.clean)
 
 
 if __name__ == "__main__":
