@@ -23,13 +23,11 @@ OUT_FILE = PROJECT_ROOT / f"quartz-fullstack-{timestamp}.zip"
 EXCLUDE_PATTERNS = [
     "node_modules",
     ".spec",
-    "input/*",
     "output/*",
     "settings/*",
     "*.log",
     ".git",
     ".claude",
-    "scripts/*",
     ".gitignore",
     ".gitmodules",
     "*.zip",

@@ -23,11 +23,11 @@ from datetime import datetime, timedelta
 
 # 数量分布：组织 < 人员 < 项目 < 任务 < 问答
 FOLDER_CONFIGS = [
-    {"name": "组织", "prefix": "org",   "count": 100},
-    {"name": "人员", "prefix": "person","count": 1000},
-    {"name": "项目", "prefix": "proj",  "count": 200},
-    {"name": "任务", "prefix": "task",  "count": 3500},
-    {"name": "问答", "prefix": "qa",    "count": 5000},
+    {"name": "组织", "prefix": "org",   "count": 200},
+    {"name": "人员", "prefix": "person","count": 2000},
+    {"name": "项目", "prefix": "proj",  "count": 400},
+    {"name": "任务", "prefix": "task",  "count": 7000},
+    {"name": "问答", "prefix": "qa",    "count": 10000},
 ]
 
 # 字段缺失率（用于测试聚合"有则有效无则跳过"）
