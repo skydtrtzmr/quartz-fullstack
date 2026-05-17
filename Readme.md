@@ -80,3 +80,10 @@ python .\scripts\pack-project.py
 首次访问：
 - http://127.0.0.1:8766/xm?user=admin&pwd=password123
 - http://127.0.0.1:8766/testwork0?user=admin&pwd=password123
+
+
+### 注意事项
+
+1. json文件尽量不要手动修改，容易出错导致解析失败引起一系列问题。例如删数组项漏删逗号等。
+2. 可以用api查询业务域配置文件状况。
+3. 注意确保业务域根目录有index.md文件。

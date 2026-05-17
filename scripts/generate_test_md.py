@@ -23,11 +23,11 @@ from datetime import datetime, timedelta
 
 # 数量分布：组织 < 人员 < 项目 < 任务 < 问答
 FOLDER_CONFIGS = [
-    {"name": "组织", "prefix": "org",   "count": 400},
-    {"name": "人员", "prefix": "person","count": 2000},
-    {"name": "项目", "prefix": "proj",  "count": 600},
-    {"name": "任务", "prefix": "task",  "count": 7000},
-    {"name": "问答", "prefix": "qa",    "count": 10000},
+    {"name": "组织", "prefix": "org",   "count": 40},
+    {"name": "人员", "prefix": "person","count": 200},
+    {"name": "项目", "prefix": "proj",  "count": 60},
+    {"name": "任务", "prefix": "task",  "count": 700},
+    {"name": "问答", "prefix": "qa",    "count": 1000},
 ]
 
 # 字段缺失率（用于测试聚合"有则有效无则跳过"）
@@ -140,6 +140,15 @@ LAYOUT_TEMPLATES = {
             ]
         },
         "graph": {
+            "coreNodeFilter": [
+                {
+                    "type": "folder",
+                    "depth": 1,
+                    "values": [
+                    "项目"
+                    ]
+                }
+            ],
             "coreNodeLimit": 30,
             "aggregation": [
                 {"type": "folder", "depth": 1},
