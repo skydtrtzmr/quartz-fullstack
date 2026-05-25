@@ -24,11 +24,9 @@ EXCLUDE_PATTERNS = [
     "node_modules",
     ".spec",
     "output/*",
-    "settings/*",
     "*.log",
     ".git",
     ".claude",
-    "scripts/*",      # 仅排除根目录的 scripts/
     ".gitignore",
     ".gitmodules",
     "*.zip",

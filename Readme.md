@@ -78,8 +78,8 @@ python .\scripts\pack-project.py
 ```
 
 首次访问：
-- http://127.0.0.1:8766/xm?user=admin&pwd=password123
-- http://127.0.0.1:8766/testwork0?user=admin&pwd=password123
+- http://127.0.0.1:8766/demo-core?user=admin&pwd=password123
+- http://127.0.0.1:8766/demo-region?user=admin&pwd=password123
 
 
 ### 注意事项
