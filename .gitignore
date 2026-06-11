@@ -8,3 +8,4 @@ output/*
 /settings
 *.log
 *.zip
+/admin/node_modules
