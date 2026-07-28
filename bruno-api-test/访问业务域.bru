@@ -1,11 +1,11 @@
 meta {
-  name: 获取业务域构建状态
+  name: 访问业务域
   type: http
-  seq: 5
+  seq: 11
 }
 
 get {
-  url: 127.0.0.1:8766/api/domain/demo-region/status?user=admin&pwd=password123
+  url: 127.0.0.1:8766/demo-region?user=admin&pwd=password123
   body: none
   auth: inherit
 }

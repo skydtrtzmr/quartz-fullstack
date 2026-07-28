@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: 127.0.0.1:8766/api/domain/demo-core/build?user=admin&pwd=password123
+  url: http://192.168.254.221:8766/api/domain/test1/build?user=admin&pwd=password123&reset=true
   body: none
   auth: inherit
 }
@@ -13,7 +13,7 @@ post {
 params:query {
   user: admin
   pwd: password123
-  ~reset: true
+  reset: true
 }
 
 vars:pre-request {
@@ -23,4 +23,44 @@ vars:pre-request {
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+example {
+  name: example1
+  
+  request: {
+    url: http://192.168.254.221:8766/api/domain/test0/build?user=admin&pwd=password123&reset=true
+    method: POST
+    mode: none
+    params:query: {
+      user: admin
+      pwd: password123
+      reset: true
+    }
+  }
+  
+  response: {
+    headers: {
+      content-type: application/json
+      vary: Accept-Encoding
+      date: Fri, 24 Jul 2026 08:18:56 GMT
+      content-length: 197
+    }
+  
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "status": "Accepted",
+          "message": "Build triggered for domain: test0 (--reset)",
+          "command": "node --no-deprecation ./quartz/bootstrap-cli.mjs build --sqlite --reset --settings C:/Project/quartz-fullstack/settings/test0 -d C:/Project/quartz-fullstack/input/test0 -o C:/Project/quartz-fullstack/output/test0"
+        }
+      '''
+    }
+  }
 }

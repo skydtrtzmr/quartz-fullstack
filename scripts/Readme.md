@@ -9,6 +9,6 @@ uv run python scripts/generate_test_md.py --domain demo-region --profile region 
 
 # 打包
 
-python .\scripts\pack-project.py
+uv run python .\scripts\pack-project.py
 
 注意，此脚本包含生成业务域配置文件。
