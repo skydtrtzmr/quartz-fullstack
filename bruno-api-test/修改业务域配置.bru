@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: 127.0.0.1:8766/api/domain/xm2?user=admin&pwd=password123
+  url: {{ip}}/api/domain/test1?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -18,18 +18,72 @@ params:query {
 body:json {
   {
     "layout": {
-      "backlinks": {
-        "hideWhenEmpty": false,
-        "sort": {
-          "type": "natural",
-          "order": "desc",
-          "field": ""
+      {
+        "explorer": {
+          "sort": {
+            "type": "natural",
+            "order": "asc",
+            "field": ""
+          }
         },
-        "aggregation": {
-          "folder": { "depth": 2, "flatten": true },
-          "fields": [
-            { "field": "date", "granularity": "year", "order": 1 },
-            { "field": "date", "granularity": "month", "order": 2 }
+        "folderPage": {
+          "sort": {
+            "type": "natural",
+            "order": "asc",
+            "field": ""
+          }
+        },
+        "backlinks": {
+          "hideWhenEmpty": false,
+          "aggregation": [
+            {
+              "type": "folder",
+              "depth": 1
+            },
+            {
+              "type": "field",
+              "field": "type"
+            },
+            {
+              "type": "date",
+              "field": "date",
+              "granularity": "year"
+            }
+          ]
+        },
+        "graph": {
+          "coreNodeFilter": [
+            {
+              "type": "folder",
+              "depth": 1,
+              "values": [
+                "项目"
+              ]
+            }
+          ],
+          "coreNodeLimit": 50,
+          "regionRules": [
+            {
+              "type": "field",
+              "field": "type"
+            }
+          ],
+          "aggregation": [
+            {
+              "type": "folder",
+              "depth": 2,
+              "granularity": ""
+            },
+            {
+              "type": "field",
+              "field": "type",
+              "depth": 0
+            },
+            {
+              "type": "date",
+              "field": "date",
+              "granularity": "year"
+            }
           ]
         }
       }
@@ -85,7 +139,7 @@ example {
           }
         }
       }
-                
+                        
     }
   }
   
