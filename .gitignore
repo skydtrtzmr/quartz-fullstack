@@ -9,3 +9,5 @@ output/*
 *.log
 *.zip
 /admin/node_modules
+/.spec
+/.codebuddy

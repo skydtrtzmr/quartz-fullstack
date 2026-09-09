@@ -12,3 +12,11 @@ uv run python scripts/generate_test_md.py --domain demo-region --profile region 
 uv run python .\scripts\pack-project.py
 
 注意，此脚本包含生成业务域配置文件。
+
+
+---
+
+uv:
+
+# 清理所有旧业务域并生成
+uv run python scripts/generate_test_md.py --domain demo-region --profile region --clean --clean-all

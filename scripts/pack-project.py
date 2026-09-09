@@ -30,7 +30,8 @@ EXCLUDE_PATTERNS = [
     ".gitignore",
     ".gitmodules",
     "*.zip",
-    "public/*"
+    "public/*",
+    "server/config.json"
 ]
 
 # 保留的文件（即使匹配排除规则）

@@ -47,6 +47,7 @@ server/examples/settings/
 | `graph.regionRules` | `AggregationRule[]` | **全局图谱**大区聚合规则。配置后首屏先显示大区节点。注意：当前实现**只取列表中第一条规则**，其余规则会被忽略 |
 | `graph.expandCoresOnRegionOpen` | `boolean` | 大区展开后是否同时展开内部核心节点。`true`（默认）时核心节点的边缘节点一并展开；`false` 时核心节点保持收起，需逐个点击展开 |
 | `graph.aggregation` | `AggregationRule[]` | 叶节点聚合规则，对核心节点的单归属边缘节点分组 |
+| `graph.colorBy` | string | 普通节点按指定 frontmatter 字段分配分类颜色，例如 `type`。当前节点、标签与未配置该字段的节点仍使用默认颜色。 |
 
 `backlinks.aggregation` 和 `graph.aggregation` 使用**完全相同的结构**（`AggregationConfig`），均为 `AggregationRule[]` 规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。
 
