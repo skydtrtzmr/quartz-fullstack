@@ -6,3 +6,10 @@
 	path = server
 	url = https://github.com/skydtrtzmr/go-quartz-api-server.git
 	branch = dev
+[submodule "plugins-local/reader-mode-pro"]
+	path = plugins-local/reader-mode-pro
+	url = https://github.com/skydtrtzmr/quartz-community_reader-mode
+[submodule "plugins-local/footer-pro"]
+	path = plugins-local/footer-pro
+	url = https://github.com/skydtrtzmr/quartz-community_footer.git
+	branch = dev
