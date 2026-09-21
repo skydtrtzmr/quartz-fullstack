@@ -217,7 +217,10 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | explorer-pro | submodule → github.com/skydtrtzmr/quartz-community_explorer，分支 `dev`，upstream 已配 | ✅ 可用（v4 Explorer2 扁平化+虚拟滚动引擎整体移植；排序含 frontmatter 字段；`hideFiles` 只显示文件夹；与上游已无实质关联，仅保留仓库血统） |
 | graph-pro | submodule → github.com/skydtrtzmr/quartz-community_graph，分支 `dev`，upstream 已配 | ✅ 可用（**v4 交互层已接入**：全局 region 大区模式 + 局部目录聚合 + 数字徽标；`category: [component, emitter]` + `Graph` 组件 right/priority 10；d3@7/pixi.js@8/@tweenjs/tween.js 全部本地打包，**零 CDN**；emitter 产出 `graph/local/**` + `graph/global/graphGlobal.json`） |
 | content-meta-pro | submodule → github.com/skydtrtzmr/quartz-community_content-meta，分支 `dev`，upstream 已配 | ⬜ 占位（零改动，未注册进 YAML，避免与社区版组件重复渲染） |
-| 社区 reader-mode / footer / content-index / search / explorer | quartz-community | 已禁用（被对应的 pro 插件替代） |
+| virtual-node-pro | **本地目录**：`plugins-local/virtual-node-pro`（尚未建仓、**未接 submodule**） | ✅ 可用（v4 `VirtualNodePage` 迁移：**pageType 插件 + `generate()` 造虚拟页**，布局键 `virtual-node`；2026-09-21 实测 9/9 占位页与 v4 `virtualNodeIndex.json` 逐条一致） |
+| note-properties-pro | submodule → github.com/skydtrtzmr/quartz-community_note-properties，分支 `dev` | ✅ 可用（**frontmatter 值支持 HTML 锚点渲染**（HTML→HAST→JSX）+ 值里 `[[路径\|别名]]` / `[显示名](路径)` 命中附件则自动挂 `download` + `data-router-ignore`；新增 4 个选项 `htmlInProperties` / `downloadAttachments` / `attachmentExtensions` / `downloadNameFrom`；社区版 note-properties 已禁用） |
+| crawl-links-pro | submodule → github.com/skydtrtzmr/quartz-community_crawl-links，分支 `dev` | ✅ 可用（**正文**附件链接自动挂 `download`（另存名取链接文本、回退 basename）+ `data-router-ignore`；判定 = 带扩展名且非 `.md/.html/.htm`，可用 `attachmentExtensions` 收紧；社区版 crawl-links 已禁用） |
+| 社区 reader-mode / footer / content-index / search / explorer / note-properties / crawl-links | quartz-community | 已禁用（被对应的 pro 插件替代） |
 | 社区 graph | quartz-community | 已禁用（被 graph-pro 替代；`enabled: false`，避免同名 `Graph` 组件重复注册） |
 
 > **graph-pro 输出协议（第二步交互层与 per-domain 注入都要对齐，勿改）**：
@@ -228,6 +231,19 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 
 > **本地插件命名**：npm `name` 与 `quartz.name` 均改为 `xxx-pro`、`defaultEnabled: false`（由 YAML 显式启用）；
 > `plugin add` 追加的条目 `enabled` 会跟着 `defaultEnabled`，且可能缺 `layout`/`group`——每次 `plugin add` 后手工核对 YAML 条目（见 V5-BUGS.md BUG-V5-004）。
+
+> ⚠️ **Windows 新增本地插件需手动接入 `.quartz/plugins`（junction）**：loader 安装本地插件用 `fs.symlinkSync(repo, dest, "dir")`（`gitLoader.ts:476`），在**非管理员/未开开发者模式**的 Windows 上会 `EPERM`。表现是构建日志出现：
+> ```
+> ✗ Failed to install plugin: ../plugins-local/xxx
+>   EPERM: operation not permitted, symlink ...
+> ⚠ Could not load plugin "xxx" to detect category. Skipping.
+> ```
+> 后果是**插件静默不生效**（页面/产物不生成），构建仍然"成功"。解决办法：用 **junction**（不需要特权）——
+> ```js
+> fs.symlinkSync("E:/…/plugins-local/xxx", "E:/…/quartz5/.quartz/plugins/xxx", "junction")
+> ```
+> loader 下次构建会在 `gitLoader.ts:441-454` 判断 `lstat().isSymbolicLink() && realpathSync(pluginDir) === realpathSync(repo)` 相等 → 直接复用，不再尝试创建。
+> 另注：**构建前若输出目录已存在**，`build.ts:173` 的清理会被 IDE 删除守卫拦下（`wrappedPromisesRm` 报错）→ 先 `rm -rf <输出目录>` 再构建。
 
 ---
 

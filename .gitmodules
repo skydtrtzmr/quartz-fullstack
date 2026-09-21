@@ -33,3 +33,11 @@
 	path = plugins-local/graph-pro
 	url = https://github.com/skydtrtzmr/quartz-community_graph.git
 	branch = dev
+[submodule "plugins-local/note-properties-pro"]
+	path = plugins-local/note-properties-pro
+	url = https://github.com/skydtrtzmr/quartz-community_note-properties
+	branch = dev
+[submodule "plugins-local/crawl-links-pro"]
+	path = plugins-local/crawl-links-pro
+	url = https://github.com/skydtrtzmr/quartz-community_crawl-links
+	branch = dev
