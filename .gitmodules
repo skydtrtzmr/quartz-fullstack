@@ -13,3 +13,23 @@
 	path = plugins-local/footer-pro
 	url = https://github.com/skydtrtzmr/quartz-community_footer.git
 	branch = dev
+[submodule "plugins-local/content-meta-pro"]
+	path = plugins-local/content-meta-pro
+	url = https://github.com/skydtrtzmr/quartz-community_content-meta.git
+	branch = dev
+[submodule "plugins-local/content-index-pro"]
+	path = plugins-local/content-index-pro
+	url = https://github.com/skydtrtzmr/quartz-community_content-index.git
+	branch = dev
+[submodule "plugins-local/search-pro"]
+	path = plugins-local/search-pro
+	url = https://github.com/skydtrtzmr/quartz-community_search.git
+	branch = dev
+[submodule "plugins-local/explorer-pro"]
+	path = plugins-local/explorer-pro
+	url = https://github.com/skydtrtzmr/quartz-community_explorer.git
+	branch = dev
+[submodule "plugins-local/graph-pro"]
+	path = plugins-local/graph-pro
+	url = https://github.com/skydtrtzmr/quartz-community_graph.git
+	branch = dev
