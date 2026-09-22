@@ -6,6 +6,14 @@
 
 ---
 
+构建命令：
+
+```
+cd E:\ProgramProjects\VScode_projects\quartz-fullstack\quartz5
+
+npx quartz build -d ../input/demo-region -o ../output/demo-region-sqlite --settings ../settings/demo-region-sqlite --sqlite --cacheDir ../output/demo-region-sqlite-cache
+```
+
 ## 项目文件夹结构
 
 | 名称 | 作用 | 主要文件 / 子目录 |
