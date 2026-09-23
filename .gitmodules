@@ -41,3 +41,15 @@
 	path = plugins-local/crawl-links-pro
 	url = https://github.com/skydtrtzmr/quartz-community_crawl-links
 	branch = dev
+[submodule "plugins-local/virtual-node-pro"]
+	path = plugins-local/virtual-node-pro
+	url = https://github.com/skydtrtzmr/quartz-community_virtual-node-pro.git
+	branch = dev
+[submodule "plugins-local/aggregation-pro"]
+	path = plugins-local/aggregation-pro
+	url = https://github.com/skydtrtzmr/quartz-community_aggregation-pro.git
+	branch = dev
+[submodule "plugins-local/aggregation-page-pro"]
+	path = plugins-local/aggregation-page-pro
+	url = https://github.com/skydtrtzmr/quartz-community_aggregation-page.git
+	branch = dev
