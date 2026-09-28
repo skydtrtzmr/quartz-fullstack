@@ -4,10 +4,15 @@ output/*
 
 # Keep the directories themselves
 !input/.gitkeep
+!input/demo-bench/
 !output/.gitkeep
 /settings
+/cache
 *.log
 *.zip
 /admin/node_modules
 /.spec
 /.codebuddy
+/input
+/quartz5
+/tmp-test-run

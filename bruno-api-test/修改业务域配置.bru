@@ -17,141 +17,44 @@ params:query {
 
 body:json {
   {
-    "layout": {
-        "explorer": {
-          "sort": {
-            "type": "natural",
-            "order": "asc",
-            "field": ""
-          }
-        },
-        "folderPage": {
-          "sort": {
-            "type": "natural",
-            "order": "asc",
-            "field": ""
-          }
-        },
-        "backlinks": {
-          "hideWhenEmpty": false,
-          "aggregation": [
-            {
-              "type": "folder",
-              "depth": 1
-            },
-            {
-              "type": "field",
-              "field": "type"
-            },
-            {
-              "type": "date",
-              "field": "date",
-              "granularity": "year"
-            }
-          ]
-        },
-        "graph": {
-          "coreNodeFilter": [
-            {
-              "type": "folder",
-              "depth": 1,
-              "values": [
-                "项目"
-              ]
-            }
-          ],
-          "coreNodeLimit": 50,
-          "regionRules": [
-            {
-              "type": "field",
-              "field": "type"
-            }
-          ],
-          "aggregation": [
-            {
-              "type": "folder",
-              "depth": 2,
-              "granularity": ""
-            },
-            {
-              "type": "field",
-              "field": "type",
-              "depth": 0
-            },
-            {
-              "type": "date",
-              "field": "date",
-              "granularity": "year"
-            }
-          ]
-        }
+    "page_title": "测试业务域",
+    "aggregation": {
+      "folder_depth": 1,
+      "default": ["type", "status", "category"],
+      "folders": {
+        "项目": ["阶段", "type", "status", "负责人"],
+        "任务": ["status", "阶段", "级别"],
+        "问答": ["category", "status"],
+        "组织": []
+      }
     }
   }
+}
+
+docs {
+  修改业务域配置（v5，白名单补丁）。
+
+  **没出现在请求体里的键一律不动**；出现的键按下表语义写入 quartz.config.yaml：
+
+  | 键 | 语义 |
+  |----|------|
+  | page_title | 写 configuration.pageTitle |
+  | aggregation.folder_depth | 写 configuration.aggregation.folderDepth（>= 1） |
+  | aggregation.default | 写 branches.default；传 [] 表示删除该键（= 整域不做字段聚合） |
+  | aggregation.folders | 逐目录写 branches.folders.<目录>；值为 [] 表示**删除该目录的覆盖**（恢复逐层继承） |
+
+  目录级只有「配了字段」与「未配置」两态：上面例子里「问答」被写入，「组织」被删除。
+
+  baseUrl 由服务端按 {base_url}/{domain} 注入，请求里传什么都不作数；
+  非白名单键会被忽略，并在响应的 warnings 里逐条列出。
+
+  响应 200：status=Saved、domain_info（同 GET）、warnings[]。
+  注意：改了配置后**必须带 reset=true 触发全量构建**，否则页面内嵌的图谱参数不会更新。
+
+  若该域没有 settings/{domain}/quartz.config.yaml，此接口返回 500。
 }
 
 settings {
   encodeUrl: true
   timeout: 0
-}
-
-example {
-  name: example1
-  
-  request: {
-    url: 127.0.0.1:8766/api/domain/xm2?user=admin&pwd=password123
-    method: PUT
-    mode: json
-    params:query: {
-      user: admin
-      pwd: password123
-    }
-  
-    body:json: {
-      {
-        "config": {
-          "pageTitle": "我的项目知识库",
-          "graph": {
-            "tags": {
-              "color": "#4a9eff",
-              "displayName": "标签"
-            },
-            "category": {
-              "color": "#ff6b6b",
-              "displayName": "分类"
-            }
-          }
-        },
-        "layout": {
-          "backlinks": {
-            "hideWhenEmpty": false,
-            "aggregation": {
-              "folder": {
-                "depth": 2,
-                "flatten": true
-              },
-              "fields": [
-                { "field": "date", "granularity": "year", "order": 1 },
-                { "field": "tags", "granularity": "none", "order": 2 }
-              ]
-            }
-          }
-        }
-      }
-                            
-    }
-  }
-  
-  response: {
-    status: {
-      code: 200
-      text: OK
-    }
-  
-    body: {
-      type: text
-      content: '''
-  
-      '''
-    }
-  }
 }

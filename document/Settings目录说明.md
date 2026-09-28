@@ -1,46 +1,65 @@
 # Settings 目录说明
 
-本目录存放各业务域的配置文件，每个子目录代表一个独立的业务域（domain）。
+本目录存放各业务域的配置，每个子目录代表一个独立的业务域（domain）。
+
+**每个域只有一份 `quartz.config.yaml`**，这份完整的配置文件就是唯一事实来源。
 
 ## 目录结构
 
 ```
-server/examples/settings/
-├── README.md              # 本说明文件
-├── quartz.config.json     # Quartz 运行时配置（示例）
-├── quartz.layout.json     # 布局配置（示例）
+settings/
+├── demo-region-sqlite/
+│   └── quartz.config.yaml          # 域配置（唯一的一份）
+├── demo-core/
+│   └── quartz.config.yaml
+└── ...
 ```
 
-## 配置文件说明
+## 域配置说明
 
-### 1. quartz.config.json
+### quartz.config.yaml
 
-**作用**：供 Quartz Client 读取的运行时配置，对应 `quartz.config.ts` 的 configuration 字段。
+一份 YAML 分三段：
 
-**管理方式**：通过 Server API 管理
-- `PUT /api/domain/{domain}` - 更新配置（传入 config 字段）
-- `GET /api/domain/{domain}` - 获取配置
+| 段 | 作用 |
+|----|------|
+| `configuration:` | 站点配置：`pageTitle` / `baseUrl` / `locale` / `theme` / `ignorePatterns` / **`aggregation`** |
+| `plugins:` | 插件清单：`source` / `enabled` / `options` / `order` / `layout`（含 `position` / `priority` / `component`） |
+| `layout:` | 页型级布局调整：`groups` / `byPageType`（可为某页型 `exclude` 组件或清空某栏位） |
 
-**注意**：请勿手动修改，会被 API 调用覆盖。
+**管理方式**：通过 Server API 管理，服务端**只按白名单改字段**，注释、锚点别名、键序、插件清单与 `layout:` 段全部保留
+- `GET /api/domain/{domain}` - 读取元信息（含 `aggregation` 视图与校验告警）
+- `PUT /api/domain/{domain}` - 白名单补丁：`page_title` / `aggregation.{folder_depth,default,folders}`
+- `POST /api/domain/{domain}` - 建域：整棵配置继承 `server/config.json` 的 `template_file`
 
-### 2. quartz.layout.json
+**注意**：`configuration.baseUrl` 由服务端按 `{base_url}/{domain}` 注入，手工改了也会在下次写入时被覆盖。
+`configuration.pageTitle` 可以手工改，也可以走 API。
 
-**作用**：覆盖 Quartz 布局行为（排序、聚合等）。
+### 聚合配置（configuration.aggregation）
 
-**支持字段**：
+**这已经取代了 v4 的 `backlinks.aggregation` / `graph.aggregation`**：聚合规则不再按组件各配一份，而是全站一份，写在这里。
 
-| 字段 | 说明 |
-|------|------|
-| `explorer.sort` | 文件浏览器排序配置 |
-| `folderPage.sort` | 文件夹页面排序配置 |
-| `backlinks.hideWhenEmpty` | 无反向链接时是否隐藏 |
-| `backlinks.sort` | 反向链接排序配置 |
-| **聚合配置（backlinks / graph 共用同一结构）** | |
-| `{component}.aggregation[]` | 聚合规则列表，按数组顺序执行 |
-| `{component}.aggregation[].type` | 聚合维度类型：`folder` \| `field` \| `date` |
-| `{component}.aggregation[].field` | 字段名（`field`/`date` 用，`folder` 可省略） |
-| `{component}.aggregation[].depth` | 文件夹截取深度（仅 `folder` 有效） |
-| `{component}.aggregation[].granularity` | 日期粒度：`year` \| `month` \| `quarter`（仅 `date` 有效） |
+```yaml
+configuration:
+  aggregation:
+    minGroupSize: 1        # 目录分支里当前层只要有一类达到阈值就统一聚合全部类别
+    folderDepth: 1         # 目录上下文层数（文件夹恒为第一层）
+    branches:
+      default: [type, status, category]
+      folders:             # 某个目录配了就用它；没配就逐层向上继承，最后用 default
+        项目: [阶段, type, status, 负责人]
+        任务: [status, 阶段, 级别]
+```
+
+- 字段链写**纯字段名**，顺序即分组顺序。
+- **目录级只有两态**：「配了字段」与「未配置」。写空数组（`问答: []`）等价于未配置（构建期会告警），不存在「显式中断聚合」。
+- 「整个域不做字段聚合」用 `default: []`（或不写 `branches`）表达。
+- 目录页（`index.md`）代表文件夹自身，不算该文件夹的成员：既不当核心节点 / 大区成员，也不计入维度子图的 scope。
+
+### 新建 / 复制域
+
+- 新建：`POST /api/domain/{domain}` —— 整棵配置继承 `server/config.json` 里的 `template_file`，只改写 `pageTitle` / `baseUrl`。
+- 复制现成域：`cp settings/<其它域>/quartz.config.yaml settings/{domain}/`，再改 `pageTitle` 与 `baseUrl`。
 | **图谱专属字段** | | |
 | `graph.coreNodeFilter` | `CoreNodeFilterRule[]` | **全局图谱**核心节点筛选规则（OR 关系）。<br/>**核心节点判定逻辑**：<br/>① 若配置了 `coreNodeFilter`，则按规则匹配（OR 关系，匹配任一规则即为核心节点）；<br/>② 若未配置 `coreNodeFilter`，则回退为连接数阈值：**连接数 > 2** 的节点为核心节点。<br/>**只有核心节点才会被 `regionRules` 归入大区**。例如 tasks 文件夹下的节点通常只连 1 个 person + 1 个 project（连接数 = 2），不满足 > 2，因此不会成为核心节点，也不会产生 `region:tasks` |
 | `graph.coreNodeLimit` | number | **全局图谱**核心节点数量硬上限（默认 `100`） |
@@ -49,7 +68,8 @@ server/examples/settings/
 | `graph.aggregation` | `AggregationRule[]` | 叶节点聚合规则，对核心节点的单归属边缘节点分组 |
 | `graph.colorBy` | string | 普通节点按指定 frontmatter 字段分配分类颜色，例如 `type`。当前节点、标签与未配置该字段的节点仍使用默认颜色。 |
 
-`backlinks.aggregation` 和 `graph.aggregation` 使用**完全相同的结构**（`AggregationConfig`），均为 `AggregationRule[]` 规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。
+v4 的 `backlinks.aggregation` / `graph.aggregation` 已合并为**全站一份**的 `configuration.aggregation`：
+字段级分组不再按组件各配一份，图谱、反向链接与目录树消费的是同一条规则链。
 
 ### 常见注意事项
 
@@ -90,7 +110,7 @@ server/examples/settings/
 
 #### 3. 修改配置文件后必须全量构建
 
-增量构建**会重新生成 `graphGlobal.json`**（emitter 始终全量执行），但修改 `quartz.layout.json` 不会触发已有 HTML 页面的重建。这会导致各页面中内嵌的图谱参数（如 `data-precompute-depth`）保持旧值，与新的 `graphGlobal.json` 不一致。
+增量构建**会重新生成 `graphGlobal.json`**（emitter 始终全量执行），但修改 `quartz.config.yaml` 不会触发已有 HTML 页面的重建。这会导致各页面中内嵌的图谱参数（如 `data-precompute-depth`）保持旧值，与新的 `graphGlobal.json` 不一致。
 
 因此修改配置文件后，**必须带 `--reset` 参数触发全量构建**。
 
@@ -133,22 +153,24 @@ API 方式：`POST /api/domain/{domain}/build?user=admin&pwd=password123&reset=t
 
 **排序值相同时的处理（Tie-Breaker）**：当两个文件的主排序字段值相同时，系统会**隐式使用 `title` 的自然排序（natural asc）作为二次排序**。`title` 通常与文件名一致，因此可理解为"按文件名的自然升序"作为兜底规则。
 
-**不同文件夹使用不同排序逻辑**：`quartz.layout.json` 中的排序配置是全局的，但不同文件夹可以通过在各自文件的 frontmatter 中设置**同一排序字段的不同值**来实现差异化排序效果。例如全局配置 `"field": "priority"`，项目文件夹下的文件设置 `priority: 1, 2, 3...`，任务文件夹下的文件也设置各自的 `priority` 值，各自文件夹内即按该字段独立排序。
+**不同文件夹使用不同排序逻辑**：`quartz.config.yaml` 里 `plugins[explorer-pro].options.sort` 的排序配置是全局的，但不同文件夹可以通过在各自文件的 frontmatter 中设置**同一排序字段的不同值**来实现差异化排序效果。例如全局配置 `"field": "priority"`，项目文件夹下的文件设置 `priority: 1, 2, 3...`，任务文件夹下的文件也设置各自的 `priority` 值，各自文件夹内即按该字段独立排序。
 
 ## 创建新业务域
 
 ### 方式一：通过 API（推荐）
 
 ```bash
-POST /api/domain/{domain}
-{
-  "domain_name": "myproject",
-  "display_name": "我的项目"
-}
+curl -X POST "http://127.0.0.1:8766/api/domain/myproject?user=admin&pwd=password123" \
+  -H "Content-Type: application/json" \
+  -d '{"page_title": "我的项目"}'
 ```
+
+域配置整棵继承 `server/config.json` 里的 `template_file`，只改写 `configuration.pageTitle` 与
+`configuration.baseUrl`；同时创建 `input/myproject/` 与默认 `index.md`。
+随后用 `POST /api/domain/myproject/build?reset=true` 触发构建。
 
 ### 方式二：手动复制
 
-1. 复制本目录中的示例文件到 `settings/{domain}/`
-2. 修改 `quartz.config.json` 和 `quartz.layout.json`
-3. 调用 `POST /api/domain/{domain}/build` 触发构建
+1. 复制一份现成的 `settings/<其它域>/quartz.config.yaml` 到 `settings/{domain}/`
+2. 改写 `configuration.pageTitle` 与 `configuration.baseUrl`（`{base_url}/{domain}`），其余保持不动
+3. 调用 `POST /api/domain/{domain}/build?reset=true` 触发构建

@@ -53,3 +53,7 @@
 	path = plugins-local/aggregation-page-pro
 	url = https://github.com/skydtrtzmr/quartz-community_aggregation-page.git
 	branch = dev
+[submodule "plugins-local/echarts-pro"]
+	path = plugins-local/echarts-pro
+	url = https://github.com/skydtrtzmr/quartz-community_echarts-pro.git
+	branch = dev

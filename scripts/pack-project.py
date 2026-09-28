@@ -24,6 +24,7 @@ EXCLUDE_PATTERNS = [
     "node_modules",
     ".spec",
     "output/*",
+    "cache/*",
     "*.log",
     ".git",
     ".claude",

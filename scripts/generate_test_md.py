@@ -37,6 +37,8 @@ MISSING_RATE = {
     "status": 0.15,
     "tags": 0.25,
     "category": 0.30,
+    "阶段": 0.20,            # 项目/任务/组织的生命周期阶段
+    "级别": 0.15,            # 高/中/低 优先级分级
     "organization": 0.05,   # 人员所属组织（极少缺失）
     "project": 0.10,        # 任务所属项目
     "owner": 0.15,          # 项目负责人
@@ -68,6 +70,24 @@ CATEGORY_POOLS = {
     "问答": ["前端", "后端", "运维", "产品", "数据", "算法"],
 }
 
+# 阶段：实体在其生命周期中的阶段（用于二级动态分类演示）
+PHASE_POOLS = {
+    "组织": ["筹备", "扩张", "稳定", "收缩", "重组"],
+    "人员": ["入职", "转正", "晋升", "轮岗", "离职"],
+    "项目": ["立项", "计划", "执行", "收尾", "验收"],
+    "任务": ["待办", "进行", "联调", "测试", "发布"],
+    "问答": ["提问", "排查", "验证", "归档", "关闭"],
+}
+
+# 级别：粗粒度的优先级分级（高/中/低），作为第三分类轴演示
+LEVEL_POOLS = {
+    "组织": ["高", "中", "低"],
+    "人员": ["高", "中", "低"],
+    "项目": ["高", "中", "低"],
+    "任务": ["高", "中", "低"],
+    "问答": ["高", "中", "低"],
+}
+
 TAGS_POOLS = {
     "组织": ["核心部门", "支持部门", "创新单元", "成本中心", "利润中心", "矩阵", "扁平"],
     "人员": ["专家", "骨干", "新人", "导师", "远程", "全职", "兼职", "Leader"],
@@ -75,6 +95,139 @@ TAGS_POOLS = {
     "任务": ["前端", "后端", "数据库", "API", "UI", "安全", "性能", "兼容"],
     "问答": ["Bug", "最佳实践", "架构", "排障", "配置", "权限", "迁移", "优化"],
 }
+
+# ============ 图表样例（任务 1：图表代码块渲染）============
+# 围栏块语言标记必须是 `echarts`，块内容必须是**合法 JSON 对象**（ECharts option 原样透传）；
+# 渲染由本地插件 `plugins-local/echarts-pro` 负责（height / styleMode 由该插件 YAML options 控制）。
+# 这里覆盖几种常见图表类型，轮流分配给生成的图表文件。
+CHART_SPECS = [
+    ("折线图", {
+        "title": {"text": "月度任务完成量趋势"},
+        "tooltip": {"trigger": "axis"},
+        "xAxis": {"type": "category", "data": ["1月", "2月", "3月", "4月", "5月", "6月"]},
+        "yAxis": {"type": "value"},
+        "series": [{"type": "line", "smooth": True, "data": [820, 932, 901, 1290, 1330, 1450]}],
+    }),
+    ("面积折线图", {
+        "title": {"text": "项目投入与产出"},
+        "tooltip": {"trigger": "axis"},
+        "legend": {"data": ["投入", "产出"]},
+        "xAxis": {"type": "category", "boundaryGap": False, "data": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]},
+        "yAxis": {"type": "value"},
+        "series": [
+            {"name": "投入", "type": "line", "stack": "总量", "areaStyle": {}, "data": [120, 132, 101, 134, 90, 230, 210]},
+            {"name": "产出", "type": "line", "stack": "总量", "areaStyle": {}, "data": [220, 182, 191, 234, 290, 330, 310]},
+        ],
+    }),
+    ("柱状图", {
+        "title": {"text": "各类型任务数量"},
+        "tooltip": {"trigger": "axis"},
+        "xAxis": {"type": "category", "data": ["开发", "测试", "文档", "评审", "调研", "部署"]},
+        "yAxis": {"type": "value"},
+        "series": [{"type": "bar", "data": [120, 200, 150, 80, 70, 110]}],
+    }),
+    ("堆叠柱状图", {
+        "title": {"text": "各阶段任务状态分布"},
+        "tooltip": {"trigger": "axis"},
+        "legend": {},
+        "xAxis": {"type": "category", "data": ["待办", "进行", "联调", "测试", "发布"]},
+        "yAxis": {"type": "value"},
+        "series": [
+            {"name": "已完成", "type": "bar", "stack": "total", "data": [320, 302, 301, 334, 390]},
+            {"name": "进行中", "type": "bar", "stack": "total", "data": [120, 132, 101, 134, 90]},
+            {"name": "阻塞中", "type": "bar", "stack": "total", "data": [220, 182, 191, 234, 290]},
+        ],
+    }),
+    ("横向条形图", {
+        "title": {"text": "各部门人员规模"},
+        "tooltip": {"trigger": "axis"},
+        "xAxis": {"type": "value"},
+        "yAxis": {"type": "category", "data": ["研发部", "产品部", "设计部", "运营部", "测试部"]},
+        "series": [{"type": "bar", "data": [42, 18, 12, 25, 15]}],
+    }),
+    ("饼图", {
+        "title": {"text": "问题类型占比"},
+        "tooltip": {"trigger": "item"},
+        "legend": {"orient": "vertical", "left": "left"},
+        "series": [{
+            "type": "pie",
+            "radius": "55%",
+            "data": [
+                {"name": "技术问题", "value": 1048},
+                {"name": "业务问题", "value": 735},
+                {"name": "流程问题", "value": 580},
+                {"name": "使用问题", "value": 484},
+                {"name": "方案咨询", "value": 300},
+            ],
+        }],
+    }),
+    ("环形图", {
+        "title": {"text": "任务优先级分布"},
+        "tooltip": {"trigger": "item"},
+        "legend": {"bottom": 0},
+        "series": [{
+            "type": "pie",
+            "radius": ["40%", "65%"],
+            "avoidLabelOverlap": True,
+            "label": {"show": False},
+            "data": [
+                {"name": "高", "value": 335},
+                {"name": "中", "value": 480},
+                {"name": "低", "value": 210},
+            ],
+        }],
+    }),
+    ("散点图", {
+        "title": {"text": "工时与产出关系"},
+        "tooltip": {"trigger": "item"},
+        "xAxis": {"type": "value", "name": "工时"},
+        "yAxis": {"type": "value", "name": "产出"},
+        "series": [{
+            "type": "scatter",
+            "symbolSize": 12,
+            "data": [[10.0, 8.04], [8.07, 6.95], [13.0, 7.58], [9.05, 8.81], [11.0, 8.33], [14.0, 7.66], [13.4, 6.81], [10.0, 6.33], [14.0, 8.96]],
+        }],
+    }),
+    ("雷达图", {
+        "title": {"text": "项目多维评估"},
+        "tooltip": {},
+        "legend": {"data": ["项目A", "项目B"]},
+        "radar": {
+            "indicator": [
+                {"name": "进度", "max": 100},
+                {"name": "质量", "max": 100},
+                {"name": "成本", "max": 100},
+                {"name": "风险", "max": 100},
+                {"name": "协作", "max": 100},
+            ],
+        },
+        "series": [{
+            "type": "radar",
+            "data": [
+                {"value": [85, 90, 70, 60, 88], "name": "项目A"},
+                {"value": [70, 82, 88, 75, 66], "name": "项目B"},
+            ],
+        }],
+    }),
+    ("仪表盘", {
+        "title": {"text": "整体完成度"},
+        "tooltip": {"formatter": "{a} <br/>{b} : {c}%"},
+        "series": [{
+            "type": "gauge",
+            "progress": {"show": True},
+            "detail": {"valueAnimation": True, "formatter": "{value}%"},
+            "data": [{"value": 72, "name": "完成度"}],
+        }],
+    }),
+]
+
+# 图表样例目录的分类池（与其它目录同构，便于一并参与聚合 / 排序 / 图谱验证）
+TYPE_POOLS["图表"] = ["柱状图", "折线图", "饼图", "散点图", "雷达图"]
+STATUS_POOLS["图表"] = ["草稿", "已验证", "已发布"]
+CATEGORY_POOLS["图表"] = ["趋势", "占比", "分布", "对比", "监控"]
+PHASE_POOLS["图表"] = ["样例", "验收", "归档"]
+LEVEL_POOLS["图表"] = ["高", "中", "低"]
+TAGS_POOLS["图表"] = ["echarts", "图表", "可视化", "样式"]
 
 # 日期范围
 DATE_START = datetime(2020, 1, 1)
@@ -209,6 +362,16 @@ def build_frontmatter_lines(title: str, folder_name: str, extra_fields: dict) ->
     if val:
         lines.append(f'category: "{val}"')
 
+    # 阶段（生命周期阶段）
+    val = maybe(random.choice(PHASE_POOLS[folder_name]), MISSING_RATE["阶段"])
+    if val:
+        lines.append(f'阶段: "{val}"')
+
+    # 级别（优先级分级）
+    val = maybe(random.choice(LEVEL_POOLS[folder_name]), MISSING_RATE["级别"])
+    if val:
+        lines.append(f'级别: "{val}"')
+
     # tags
     val = maybe(None, MISSING_RATE["tags"])
     if val is not None:
@@ -254,6 +417,38 @@ def generate_index_md(folder_path: str, folder_name: str):
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"  [index] {filepath}")
+
+
+def generate_chart_files(target_dir: str, domain: str, count: int):
+    """生成图表样例文件（`<domain>/图表/chart-NNN.md`），覆盖 CHART_SPECS 里的常见图表类型。
+
+    每个文件的 frontmatter 与其它目录同构（分类维度齐全，能被聚合/排序/图谱测到），
+    正文里是一个语言标记为 `echarts` 的围栏块，内容是 ECharts option 的 JSON 对象。
+    """
+    folder = "图表"
+    folder_path = os.path.join(target_dir, folder)
+    os.makedirs(folder_path, exist_ok=True)
+    generate_index_md(folder_path, folder)
+
+    for i in range(count):
+        name, option = CHART_SPECS[i % len(CHART_SPECS)]
+        file_num = i + 1
+        title = f"{folder}-{file_num:03d}"
+        filename = f"chart-{file_num:03d}.md"
+        frontmatter = build_frontmatter_lines(title, folder, {})
+        block = json.dumps(option, ensure_ascii=False, indent=2)
+        body = (
+            f"# {title}（{name}）\n\n"
+            f"本文件用于验证 Quartz 对**图表代码块**的解析与渲染：\n\n"
+            f"```echarts\n{block}\n```\n\n"
+            f"代码块之外的内容与其它测试文件一致，便于一并参与聚合 / 排序 / 图谱验证"
+            f"（参见 [[{folder}/]]）。\n"
+        )
+        with open(os.path.join(folder_path, filename), "w", encoding="utf-8") as f:
+            f.write("\n".join(frontmatter))
+            f.write("\n\n")
+            f.write(body)
+    print(f"  [done] {folder}: {count} 个图表样例（{len(CHART_SPECS)} 种类型轮流）")
 
 
 def generate_root_index_md(target_dir: str, domain: str):
@@ -560,10 +755,25 @@ def main():
     parser.add_argument("--clean", action="store_true", help="清空目标目录后重新生成")
     parser.add_argument("--clean-all", action="store_true",
                         help="清理所有旧业务域，只保留当前指定的业务域")
+    parser.add_argument("--charts", type=int, default=0,
+                        help="额外生成 N 个图表样例文件（覆盖常见图表类型，放 <domain>/图表/）")
+    parser.add_argument("--charts-only", action="store_true",
+                        help="只生成图表样例，不重新生成其它内容与域配置文件（需配合 --charts N）")
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
+    target_dir = os.path.join(project_root, "input", args.domain)
+
+    # 只补图表样例：不动既有内容与 settings（避免整域随机重生成）
+    if args.charts_only:
+        if args.charts <= 0:
+            parser.error("--charts-only 需要同时指定 --charts N（N > 0）")
+        os.makedirs(target_dir, exist_ok=True)
+        print(f"[target] {target_dir}")
+        generate_chart_files(target_dir, args.domain, args.charts)
+        print(f"[summary] 仅生成图表样例：{args.charts} 个 → {os.path.join(target_dir, '图表')}")
+        return
 
     # 清理所有旧业务域
     if args.clean_all:
@@ -574,6 +784,10 @@ def main():
 
     # 生成 Markdown 文件
     generate_domain(project_root, args.domain, args.profile, args.clean)
+
+    # 额外生成图表样例
+    if args.charts > 0:
+        generate_chart_files(target_dir, args.domain, args.charts)
 
 
 if __name__ == "__main__":

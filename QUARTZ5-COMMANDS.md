@@ -26,6 +26,13 @@ quartz-fullstack/
 > 没有例外——不因"改动小"而复制骨架成普通目录。
 > **改任何插件前，先等用户建好 GitHub 仓库**，AI 不得擅自启动插件改造。
 > 增量改动一律提交并推送到 **dev 分支**（main 保持镜像上游干净状态）。
+>
+> **自研插件（非 fork）同样适用**：一样「独立仓库 + submodule + 接 `dev` 分支」，唯一区别是
+> **不配 `upstream`**（没有社区上游可 merge）。工程示例：`plugins-local/virtual-node-pro` →
+> `https://github.com/skydtrtzmr/quartz-community_virtual-node-pro`（2026-09-21 转正）。
+> 目录里已有插件源码、只是没建仓时，做法：删掉误建的空壳 → 插件目录 `git init -b main` +
+> 提交（其自带 `.gitignore` 已排除 `node_modules/`、`dist/`）→ push `main` 与 `dev` →
+> 目录**改名暂存** → `git submodule add -b dev <url> plugins-local/<插件>` → 比对文件清单一致后删暂存。
 
 ```powershell
 # 已有 submodule 的插件：主仓库拉取后初始化（换电脑必跑）
@@ -86,6 +93,55 @@ git push                      # 推回自己的 fork
 ---
 
 ## 二、构建 quartz5
+
+### 本地 SQLite 增量构建（2026-09-22）
+
+使用项目已有的 npm 脚本，确保运行当前工作区源码。Windows 入口已补 `node`；当前 package.json 未声明 `quartz` bin，旧示例中的 `npx quartz` 可能走 npm 缓存入口，构建请改用 `npm run quartz -- build`。
+
+```powershell
+cd E:\ProgramProjects\VScode_projects\quartz-fullstack\quartz5
+npm run quartz -- build -d ../input/demo-region -o ../output/demo-region-sqlite --settings ../settings/demo-region-sqlite --sqlite --cacheDir ../cache/demo-region-sqlite
+```
+
+首次全量建立缓存；以后同一条命令处理新增、修改和删除，无变化直接跳过。强制重建在末尾加 `--reset`（清空指定 output 和缓存）。预览地址：`http://127.0.0.1:9766/demo-region-sqlite/`。
+
+SQLite 只在所有插件写出成功后记录完成状态和产物清单。旧缓存、上次构建失败、输出目录变更或产物缺失会自动重建完整基线。修改 YAML 或插件后请加 `--reset`，普通内容变化无需加。
+
+### 共享聚合规则（2026-09-22 引入；2026-09-26 配置写法简化）
+
+`aggregation-pro` 以独立 submodule 接入（dev），目前只在 `settings/demo-region-sqlite` 启用，order 45。
+它严格校验 `configuration.aggregation`，编译 `output/demo-region-sqlite/static/aggregation.json`。
+消费方：`explorer-pro`（目录树动态分类）、`aggregation-page-pro`（维度页）、`graph-pro`（图谱分组）。
+
+**配置写法（2026-09-26 起）**：文件夹恒为第一层、只设层数；字段链写**纯字段名**。
+
+```yaml
+aggregation:
+  minGroupSize: 1
+  folderDepth: 1                      # 取代 root: {type: folder, depth}
+  branches:
+    default: [type, status, category]
+    folders:
+      项目: [阶段, type, status, 负责人]
+      # 不配 = 逐层继承上面两级；空数组等价于不配（会告警），没有「显式停止继承」这一态
+```
+
+- `branches.folders` 中未配置的上下文逐层向父目录回退，最终使用 `branches.default`。
+  **目录级只有「配了字段」与「未配置」两态**：`目录: []` 等价于未配置并告警；
+  「整个域不做字段聚合」由 `branches.default: []`（或不写 `branches`）表达。
+- 非法配置**直接抛错**（unknown key / 非整数深度 / 非字符串字段名 / 目录穿越），不静默回退。
+- **产物结构未变**：仍含 `version/configHash/minGroupSize/root/branches/resolved`，`resolved[目录]` 仍是 `[{type:"field",field}]` —— 编译期把新写法转回内部对象，**下游三个插件零改动**。
+- ⚠️ **「逐层回退」的平行实现有三处，改语义必须同步**：`aggregation-pro/src/compiler.ts`、**`aggregation-page-pro/src/util/rules.ts`**（维度页生成跑在 Phase 1，读不到 Phase 2 才写出的产物；漏改会让维度页整体不生成）、**`note-properties-pro/src/util/propertiesChain.ts`**（属性显示链，配置段是 `options.properties`，与聚合同构）。
+- ⚠️ `configuration.aggregation` **只有 sqlite 域配了**；`demo-region-v5` / `demo-region-novnode` 未配（其图谱按「仅文件夹」兜底分组）。
+- 修改 YAML 后仍必须 `--reset`（SQLite 配置变更自动失效未实现）。
+
+查看产物（带授权）：
+http://127.0.0.1:9766/demo-region-sqlite/static/aggregation.json?user=admin&pwd=password123
+
+本轮原输出与缓存保留在 `output/demo-region-sqlite-before-aggregation-phase1`、
+`output/demo-region-sqlite-cache-before-aggregation-phase1`，供回退。
+
+职责：核心维护构建完成状态；content-index-pro 合并完整索引并同步生成页的增删；graph-pro 更新变更前后的局部图邻居并重算全局图。插件源码修改后仍需先在插件目录 `npm run build`。
 
 ### 基本构建（指定 input/output）
 
@@ -195,8 +251,10 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | `normalizeHastElement` 导入错误 | 根目录 `@quartz-community/utils` 版本漂移；`npm install @quartz-community/utils@^1.0.0` |
 | 输出页面按钮重复 | YAML 里新旧两个同类插件同时 enabled；把社区版改 `enabled: false` |
 | **插件组件不在同一行（掉出工具组）** | `plugin add` 自动追加的 YAML 条目缺 `group: toolbar`；手动补上该字段 |
+| 构建日志报 `✗ Failed to install plugin: ../plugins-local/xxx` + `EPERM: operation not permitted, symlink`、随后 `⚠ Could not load plugin "xxx" to detect category. Skipping.` | **该本地插件在 `.quartz/plugins/` 下没有条目**（junction 没建过），loader 便尝试新建 symlink，Windows 非管理员/未开开发者模式必然 EPERM → 插件**静默不生效**（构建仍然"成功"）。常见触发：某个域 YAML（`settings/<domain>/quartz.config.yaml`）引用了主 YAML 里没启用的本地插件。**两步修**：① 建 junction（无需管理员）`New-Item -ItemType Junction -Path "<…>\quartz5\.quartz\plugins\<插件>" -Target "<…>\plugins-local\<插件>"`；② 确认该插件有 `dist/`，没有就 `npm install && npm run build`。自查：`.quartz/plugins/` 下每个 `plugins-local/*` 都应有 Junction 条目 |
 | **插件 CSS 规则被主样式覆盖** | base.scss 竞争规则带 ID 选择器（如 `.page>#quartz-body .sidebar` 特异性 (1,2,0)），插件侧栏规则必须写成 `:root[reader-mode=on] #quartz-body .sidebar.left` (1,4,0) 才能赢；写插件 CSS 前先查 base.scss 对应选择器的层级 |
-| 搜索结果链接/预览 404，或图谱/explorer 运行时请求 404 | YAML 的 `baseUrl` 子路径必须与 Go server 的 domain 目录名一致（`body[data-basepath]` 来源于它）；不同 domain 需各自一份 YAML（per-domain YAML 方案见 V5-BUGS.md BUG-V5-006）。临时办法：构建前把 `baseUrl` 改成目标 domain 再 build |
+| 搜索结果链接/预览 404，或图谱/explorer 运行时请求 404 | YAML 的 `baseUrl` 子路径必须与**产物目录名（= URL 前缀）**一致（`body[data-basepath]` 来源于它）。**v5 侧做法**：新建 `settings/<domain>/quartz.config.yaml`（主 YAML 完整副本，只改 `baseUrl: <host>/<domain>`），构建时 `-o ../output/<domain> --settings ../settings/<domain>`——三者同名即对齐（`demo-region-v5` 为实例）。也可临时把主 YAML 的 `baseUrl` 改成目标 domain 再 build（不是好习惯，容易忘改回去）；详见 V5-BUGS.md BUG-V5-006 |
+| **点任意站内链接都 404，URL 形如 `/demo-region-v5/组织/org-00002`（无 `.html`）** | 用的是**缺少 clean-url 回退的静态服务**（典型是 `python -m http.server`）：产物文件名是 `组织/org-00002.html`，而 Quartz 的链接不带扩展名 → 必然 404。**解决：用 Go server（9766）或 `npx quartz build ... --serve`**；`python -m http.server` 只适合"看文件在不在"，不能用来点链接（与 `baseUrl`/`data-basepath` 无关） |
 | 构建报 `[safe-delete] trash 操作失败` | 输出目录被占用（http.server / 编辑器 / 资源管理器）；关掉占用进程后重试，或直接手动删输出目录 |
 | 构建报 `[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED]` | 一次性删除文件数超阈值被拦（如整个 output/demo-bench 是 2 万文件）；绕过法：先 `mv output/demo-bench output/demo-bench-prev-<日期>` 再构建 |
 | **`--serve` 后再构建异常/页面空白/文件变少** | 旧的 serve 进程没退干净（Ctrl+C 不彻底或终端被直接关闭），它占着端口且其 watcher 会与新构建赛跑互删文件。处理：`netstat -ano \| findstr :8080` 找 PID → `Stop-Process -Id <PID> -Force` → 重新构建。**退出 serve 必须在终端 Ctrl+C 并等提示符返回** |
@@ -217,7 +275,7 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | explorer-pro | submodule → github.com/skydtrtzmr/quartz-community_explorer，分支 `dev`，upstream 已配 | ✅ 可用（v4 Explorer2 扁平化+虚拟滚动引擎整体移植；排序含 frontmatter 字段；`hideFiles` 只显示文件夹；与上游已无实质关联，仅保留仓库血统） |
 | graph-pro | submodule → github.com/skydtrtzmr/quartz-community_graph，分支 `dev`，upstream 已配 | ✅ 可用（**v4 交互层已接入**：全局 region 大区模式 + 局部目录聚合 + 数字徽标；`category: [component, emitter]` + `Graph` 组件 right/priority 10；d3@7/pixi.js@8/@tweenjs/tween.js 全部本地打包，**零 CDN**；emitter 产出 `graph/local/**` + `graph/global/graphGlobal.json`） |
 | content-meta-pro | submodule → github.com/skydtrtzmr/quartz-community_content-meta，分支 `dev`，upstream 已配 | ⬜ 占位（零改动，未注册进 YAML，避免与社区版组件重复渲染） |
-| virtual-node-pro | **本地目录**：`plugins-local/virtual-node-pro`（尚未建仓、**未接 submodule**） | ✅ 可用（v4 `VirtualNodePage` 迁移：**pageType 插件 + `generate()` 造虚拟页**，布局键 `virtual-node`；2026-09-21 实测 9/9 占位页与 v4 `virtualNodeIndex.json` 逐条一致） |
+| virtual-node-pro | submodule → github.com/skydtrtzmr/quartz-community_virtual-node-pro，分支 `dev`（**自研插件，无 upstream**；2026-09-21 转正） | ✅ 可用（v4 `VirtualNodePage` 迁移：**pageType 插件 + `generate()` 造虚拟页**，布局键 `virtual-node`；占位页与 v4 `virtualNodeIndex.json` 逐条一致） |
 | note-properties-pro | submodule → github.com/skydtrtzmr/quartz-community_note-properties，分支 `dev` | ✅ 可用（**frontmatter 值支持 HTML 锚点渲染**（HTML→HAST→JSX）+ 值里 `[[路径\|别名]]` / `[显示名](路径)` 命中附件则自动挂 `download` + `data-router-ignore`；新增 4 个选项 `htmlInProperties` / `downloadAttachments` / `attachmentExtensions` / `downloadNameFrom`；社区版 note-properties 已禁用） |
 | crawl-links-pro | submodule → github.com/skydtrtzmr/quartz-community_crawl-links，分支 `dev` | ✅ 可用（**正文**附件链接自动挂 `download`（另存名取链接文本、回退 basename）+ `data-router-ignore`；判定 = 带扩展名且非 `.md/.html/.htm`，可用 `attachmentExtensions` 收紧；社区版 crawl-links 已禁用） |
 | 社区 reader-mode / footer / content-index / search / explorer / note-properties / crawl-links | quartz-community | 已禁用（被对应的 pro 插件替代） |
@@ -258,11 +316,31 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | 5 | `quartz5/quartz/components/Head.tsx` | **删除 `<link rel="preconnect" href="https://cdnjs.cloudflare.com">`**（原第 60 行） | 站点零外链（2026-09-20 加入） |
 | 6 | `quartz5/quartz/plugins/loader/config-loader.ts` + `quartz5/quartz/cli/args.js` | 新增 `--settings`：可指定**任意路径**的配置文件（传目录则取其中 `quartz.config.yaml`，传文件则直接用），**整份取代**默认主配置（configuration / plugins / layout 都从它读）；路径非法或缺省则告警并回退默认（不中断构建）。另在 `readPluginsJson()` 加解析容错：**仅当配置来自 `--settings` 且解析失败**时告警并回退默认主配置，**主配置自身损坏仍抛错**（不静默） | 让"每个业务域一份 `quartz.config.yaml`"可落地；Go server 构建时已在传 `--settings=<settings/<domain>>`（2026-09-21 加入） |
 
+新增补丁 #7（2026-09-22）：`quartz5/quartz/cfg.ts` 的 `GlobalConfiguration.aggregation` 类型，
+以及 `quartz5/quartz/plugins/quartz-plugins.schema.json` 的同名 schema。只定义配置边界，
+运行期校验/规范化由独立 `aggregation-pro` 负责；不在核心构建流程中实现聚合规则。
+
+新增补丁 #8（2026-09-23）：**多组件插件的组件级布局定位**（3 个文件）
+
+- `quartz5/quartz/plugins/loader/types.ts`：`PluginLayoutDeclaration` 增加可选 `component?: string`
+- `quartz5/quartz/plugins/loader/config-loader.ts` `buildLayoutForEntries()`：
+  1. 声明了 `layout.component` 时按 `pluginName/exportName` → 裸 `exportName` 解析（找不到就告警并跳过该条目，不静默）
+  2. 未声明时，若「插件名」解析不到（多组件插件没有插件名别名），退化为匹配
+     `manifest.defaultPosition === entry.layout.position` 的那个组件 —— 保证只写 `position/priority` 的老配置在多组件插件上仍落到预期组件
+- `quartz5/quartz/plugins/quartz-plugins.schema.json`：layout 增加 `component`；`position` 枚举补 `header` / `footer`（原枚举漏了这两个，而 YAML 里一直在用）
+
+原因：`loadComponentsFromPackage` 只在「插件恰好一个组件」时把插件名登记为组件别名，多组件插件的组件无法被布局解析 → 整个插件的组件静默丢弃。graph-pro 需要把「侧栏局部图谱」与「全局图谱宿主」放到不同位置（`right` / `header`），YAML 侧写法是同 source 两条条目 + `layout.component` + YAML 锚点复用 options。
+
 > **`--settings` 用法**
 > ```powershell
-> npx quartz build -d ../input/demo-region -o ../output/demo-region --settings ../settings/demo-region
-> npx quartz build -d ../input/demo-region -o ../output/demo-region --settings ../settings/demo-region/quartz.config.yaml
+> # 实际用法（demo-region-v5 域，2026-09-22 实测）：
+> # settings/<domain>/quartz.config.yaml = 主 YAML 的完整副本，只把 baseUrl 改成 <host>/<domain>
+> npx quartz build -d ../input/demo-region -o ../output/demo-region-v5 --settings ../settings/demo-region-v5
+> # 也可以直接指到文件：--settings ../settings/demo-region-v5/quartz.config.yaml
 > ```
+> ⚠️ **域规则（必须遵守）**：`-o` 的**输出目录名必须等于 `baseUrl` 的路径段**（上例都是 `demo-region-v5`），
+> 否则 `body[data-basepath]` 与实际 URL 前缀错位 → 图谱 / 搜索预览 / 结果链接等所有运行时 fetch 404（见 V5-BUGS.md BUG-V5-006）。
+> 构建日志会打印 `[settings] 使用配置：<path>`（每个 parse worker 各打一次，属正常）。
 > 配置在**导入期**加载（`quartz5/quartz.ts:3`），早于 yargs 解析，因此参数由 `resolveConfigPath()` 直接读 `process.argv`（与 v4 的 `quartz.layout.ts:41-59` 同款做法）；`--settings=<path>` 与 `--settings <path>` 都支持。
 > ⚠️ 本次只打通"指定任意配置文件"；域 YAML 里的 `aggregation` 段（文件夹粒度聚合规则）**尚未消费**（graph-pro 解析留待后续）。
 >
@@ -305,37 +383,49 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | 单击节点 | 展开/收起（大区 → 内部核心节点或子聚合；核心节点 → 邻接叶子；聚合节点 → 具体文档） |
 | 双击节点 | 跳转到该文档 |
 
-> 按钮实现：`.graph-toggle` 由 graph-pro 的组件脚本注入到 `.page-header > header`，视觉位置走 `position: fixed; top: 0.75rem; right: 3.25rem`（阅读模式是 `right: 1rem`，两者错开一格）。
+> 按钮实现：`.graph-toggle` 由 graph-pro 的 `GlobalGraphOverlay` 组件**构建期渲染**（与阅读模式按钮一样常驻 HTML，不靠脚本注入 → 不会"先空后冒出"），视觉位置走 `position: fixed; top: 0.75rem; right: 3.25rem`（阅读模式是 `right: 1rem`，两者错开一格）。
+> ⚠️ 2026-09-23 之前它是脚本注入的（`graph.inline.ts` 的 `ensureGlobalGraphToggle()`），有两个毛病：① 首屏闪一下（脚本要等 `renderLocalGraph()` 跑完才注入）② 虚拟节点页上根本不出现。现已改为组件渲染 + 脚本只绑事件，且绑定时机提到 `renderLocalGraph()` **之前**。
 >
 > **右上角按钮排**（自右向左，全部 32×32、`top: 0.75rem`、间距 4px）：
 > | 按钮 | 位置 | 来源 |
 > |------|------|------|
 > | 阅读模式（书本） | `right: 1rem` | reader-mode-pro 自带（`.readermode`，fixed） |
-> | 全局图谱（描边地球） | `right: 3.25rem` | graph-pro 脚本注入 `.graph-toggle` |
+> | 全局图谱（描边地球） | `right: 3.25rem` | graph-pro 的 `GlobalGraphOverlay` 组件（`position: header`）渲染 `.graph-toggle` |
 > | 夜间模式（日/月） | `right: 5.5rem` | 社区 darkmode 按钮；YAML 里已从左侧工具栏移到 `position: header`，再由 `quartz5/quartz/styles/custom.scss` 的 `:root .darkmode` 覆盖为 fixed |
+> | 聚合配置（滑杆） | `right: 7.75rem` | aggregation-page-pro 的 `AggregationConfigToggle` 组件（`position: header`，`layout.component` 指定）；站点没配 `configuration.aggregation` 或当前目录规则链为空时**构建期就不渲染** |
+>
+> **「本目录聚合层级」配置面板（2026-09-23）**：点滑杆按钮打开浮层，列出当前目录规则链上的字段，**拖动排序**；前 `dimensionMaxLevels` 级（explorer-pro 选项，默认 2）标为「应用中」、其余置灰（拖到前 N 位即启用）。跨插件契约：localStorage 键 `quartz:dimensionOrder:<basePath>:<目录>`（值 = 字段名数组），改完派发 `document` 上的 `aggregation-order-changed`，explorer-pro 收到后按新顺序重排目录树（`dimensionFolders: true` 时生效）。配置**只对当前目录生效**，不向子目录继承。
 >
 > `custom.scss` 是 v5 设计好的用户覆盖层：`componentResources.ts:347` 把它拼在 `@layer quartz-base` **之外**（无层样式优先于有层样式），因此不需要改插件就能覆盖已装插件的样式；必要时再用 `:root` 提升特异性。
 >
 > **为什么夜间模式写 `custom.scss` 而不是写插件**：darkmode 是**社区插件**（`@quartz-community/darkmode`，`github:quartz-community/darkmode`，`quartz.category: component`，`components.Darkmode.defaultPosition/priority = left/30`），源码落在 `quartz5/.quartz/plugins/darkmode/`——该目录被 `.gitignore:12`（`.quartz/`）忽略，是 git loader（`PLUGINS_CACHE_DIR = .quartz/plugins`）的**同步缓存**（本地插件是软链，社区插件是下载的实体目录），**改它不持久、也不进版本库**。而阅读模式/全局图谱的样式在各自**本地 fork 插件**里（`.readermode` → reader-mode-pro，`.graph-toggle` → graph-pro），因为那两个按钮是本仓库自己的组件。
 > ⚠️ `custom.scss` **不属于 §七 核心补丁清单**（那份清单是给 `glob.ts`/`renderPage.tsx` 这类上游逻辑文件打补丁用的）；它是上游预留的用户样式文件，升级时只需确认本段追加内容仍在。当前相对上游为纯新增 39 行、无删改。
 > **两个图谱图标刻意不同**：侧栏的实心"节点网络"图标 = **放大局部图谱**（`title="放大局部图谱"`）；右上角**描边地球图标** = **全局图谱**（`title="全局图谱（Ctrl/⌘+G）"`）。
-> **不能**把按钮做成 graph-pro 的第二个组件：`config-loader.ts` 只按**插件名**或插件名 PascalCase 查组件，`loadComponentsFromPackage` 仅在「插件恰好一个组件」时才注册插件名别名 → 双组件插件的组件会被布局阶段整体丢弃。
+> **全局图谱宿主是 graph-pro 的第二个组件（`GlobalGraphOverlay`）**：渲染右上角 `.graph-toggle` 按钮 + `.global-graph-outer` 覆盖层容器（其余交给 `graph.inline.ts`），挂在 `layout: { position: header, component: GlobalGraphOverlay }`。
+> 之所以要独立成组件：覆盖层原来寄生在侧栏的 `Graph` 组件里，而文件夹页/维度页会清空右栏（`positions.right: []`）→ 那两页右上角按钮点了没反应（2026-09-23 修复）。
+> 多组件插件能这样分别定位，依赖**核心补丁 #8**（`layout.component` 按导出名指定组件）。此前 `config-loader.ts` 只按**插件名**或插件名 PascalCase 查组件、且只有「插件恰好一个组件」时才登记插件名别名 → 双组件插件会被布局阶段整体丢弃。
+> ⚠️ 维度页/文件夹页只清 `positions.right`，**不要**用 `exclude: [graph-pro]`——那会把 header 里的宿主一起移除，全局图谱就又打不开了。
 
-### 关键配置（`quartz.config.yaml` 的 graph-pro 条目）
+### 关键配置（`quartz.config.yaml` 的 graph-pro 条目，2026-09-26 简化后）
 | 键 | 作用 | 当前值 |
 |----|------|--------|
 | `graph.localDepth` | 局部图谱预计算深度；运行时判定 `usePrecomputed = depth>0 && depth<=precomputeDepth` | 1 |
-| `localGraph.aggregation` | 局部图谱边缘叶子聚合（带数字徽标，点击展开） | `folder depth 1` |
-| `globalGraph.regionRules` | 全局大区聚合规则（配置后首屏只显示大区节点） | **`field: type`（按项目类型分大区）** |
+| **`globalGraph.folders`** | **主体文件夹白名单**：首屏大区 = 这些文件夹；空 / 缺省 = 全部文件夹 | `[项目]` |
 | `globalGraph.expandCoresOnRegionOpen` | 展开大区时是否连带展开内部核心节点 | `false` |
-| `globalGraph.aggregation` | 核心节点下的边缘叶子聚合（展开后按 目录/type/年份 分组） | folder1 + field type + date year |
-| `globalGraph.coreNodeFilter` | **决定哪些节点算核心节点**；folder 规则必须带 `values` | 仅 `项目` |
-| `globalGraph.coreNodeLimit` | 核心节点数量硬上限 | 50 |
+| `globalGraph.coreNodeLimit` | 核心节点数量硬上限（未配主体白名单时生效） | 50 |
 
-> ⚠️ **大区的成员来自核心节点**（大区 = 核心节点按 `regionRules[0]` 分组）：当前 `coreNodeFilter.values = [项目]`
-> 表示"核心节点只从项目类文档里选"，所以大区是**项目按类型分出的 6 个**：产品研发 / 运营支撑 / 市场推广 /
-> 基础设施建设 / 技术预研 / (未分组)（缺 `type` 的归入未分组，生成器 `MISSING_RATE.type = 0.10`）。
-> 想让人员/任务等目录也加入大区，就往 `coreNodeFilter.values` 补目录名，并按需放宽 `coreNodeLimit`。
+> ⚠️ **以下四项已删除**（2026-09-26）：`localGraph.aggregation`、`globalGraph.aggregation`、
+> `globalGraph.regionRules`、`globalGraph.coreNodeFilter`。替代关系：
+> - **邻居分组**：统一复用 `configuration.aggregation` —— 配了就由 `static/aggregation.json` 驱动（`groupShared`，按目录各自的字段链）；没配（v5 / novnode）则兜底「仅按文件夹」。
+> - **首屏大区**：恒为**文件夹**（不再按字段）。
+> - **核心节点**：`folders` 白名单命中者即核心；未配白名单时回落到「连接数 > 2」的启发式。
+>
+> 三者由 `graph-pro/src/util/graphGrouping.ts` 的 `resolveGraphGrouping()` 在**解析层合成**，
+> 运行时（`graph.inline.ts` / `views.ts`）与 `graphGlobal.json` 的结构**均未改动**（`version` 仍为 1）。
+>
+> ⚠️ **大区的成员来自核心节点**：`folders: [项目]` → 首屏只有 1 个大区「项目 (60)」，点开是 60 个主体节点
+> （实测 `graphGlobal.json`：`firstScreen = ["region:项目"]`、`coreNodeIds = 60`、`regionNodes = ["region:项目"]`）。
+> 想让人员/任务等目录也进首屏，往 `folders` 补目录名即可（多个目录 → 多个大区）。
 
 ### 力度/间距调参（对齐 v4 Graph.tsx 的 `[TUNING]`，2026-09-20）
 | 参数 | 局部图谱 | 全局图谱 | 说明 |

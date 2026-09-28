@@ -1,0 +1,31 @@
+meta {
+  name: 文件夹配置-恢复继承
+  type: http
+  seq: 11
+}
+
+delete {
+  url: {{ip}}/api/domain/demo-core/_folder/任务/年度?user=admin&pwd=password123
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+}
+
+docs {
+  删掉某目录在两个链段里的条目（= 恢复逐层继承）。
+
+  等价于 PUT 同 URL + {"aggregation": {"fields": []}, "properties": {"fields": []}}。
+  响应里的 inherit_from / inherit_fields 会告诉你它现在继承到哪、用哪些字段。
+
+  「整个域不做字段聚合」不是删某个目录，而是改链段的 default：
+  PUT /api/domain/{domain} + {"aggregation": {"default": []}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

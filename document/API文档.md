@@ -34,10 +34,39 @@ GET /api/domains?user=admin&pwd=password123
 
 ## 业务域管理 API
 
-业务域（Domain）是 Quartz 的多租户隔离单位，如 `xm`、`xm1`、`testwork0` 等。每个业务域有独立的：
-- 输入目录：`input/{domain}/`
-- 输出目录：`output/{domain}/`
-- 配置目录：`settings/{domain}/`
+业务域（Domain）是 Quartz 的多租户隔离单位，如 `demo-core`、`demo-region-sqlite` 等。
+
+**域名即目录名，四个根目录下严格同名**：
+
+| 根目录 | 路径 | 产生方式 |
+|--------|------|---------|
+| 输入 | `input/{domain}/` | 建域时创建 |
+| 配置 | `settings/{domain}/quartz.config.yaml` | 建域时从 `template_file` 继承 |
+| 输出 | `output/{domain}/` | 构建时生成 |
+| 缓存 | `cache/{domain}/.quartz-cache.db` | 构建时生成（`cache_dir` 可换根目录） |
+
+**域名规则**：必须是安全的单级目录名 —— 不含路径分隔符 `/` `\`、不含 `:*?"<>|`、不以 `.` 开头、
+无首尾空白、长度 ≤ 64、不能是 `.` 或 `..`。服务端在每个接口入口校验，并在拼路径时再次确认
+结果**严格落在对应根目录内**（`filepath.Rel` + 单级检查），所以不存在越界读写的可能。
+
+**删除范围**：`DELETE /api/domain/{domain}` 只删这四个根目录下的 `{domain}` 同名目录
+（配置目录必删；输入/输出按 body 参数；缓存总是删），不碰任何其它路径。
+
+### 域配置契约（先看这个）
+
+每个域的配置只有一份 `settings/{domain}/quartz.config.yaml`，**这份完整配置文件就是唯一事实来源**。
+服务端**不解析成结构体再重写**，而是节点级替换：
+
+- 写接口只碰白名单里的字段，其余内容（注释、锚点别名、插件清单、`layout:` 段）原样保留；
+- 白名单外的键**不报错**，会被忽略并在响应的 `warnings` 里逐条列出；
+- `baseUrl` 由服务端按 `{base_url}/{domain}` 注入，请求里传什么都不作数。
+
+| 接口 | 白名单字段 |
+|------|-----------|
+| `POST /api/domain/{domain}` | `page_title` |
+| `PUT /api/domain/{domain}` | `page_title`、`aggregation.folder_depth`、`aggregation.default`、`aggregation.folders` |
+
+---
 
 ### 1. 列出所有业务域
 
@@ -50,32 +79,39 @@ GET /api/domains
 curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
 ```
 
-**响应**：
+**响应**（`domains[]` 为 `DomainMeta`）：
 ```json
 {
-  "count": 2,
+  "count": 10,
   "domains": [
     {
-      "domain_name": "xm",
-      "display_name": "源悦知识库",
-      "config": {
-        "pageTitle": "源悦知识库",
-        "baseUrl": "http://127.0.0.1:8766/xm",
-        "graph": { "precomputeLocal": false, "localDepth": 1, "fallbackToBfs": false }
+      "domain_name": "demo-core",
+      "display_name": "demo-core",
+      "page_title": "demo-core",
+      "base_url": "localhost/demo-core",
+      "plugin_count": 55,
+      "enabled_plugins": ["../plugins-local/aggregation-pro", "github:quartz-community/created-modified-date", "..."],
+      "aggregation": {
+        "folder_depth": 2,
+        "default": ["type", "status", "category"],
+        "folders": { "项目": ["阶段", "type", "status", "负责人"], "任务": ["status", "阶段", "级别"] }
       },
-      "layout": {
-        "backlinks": { "hideWhenEmpty": false, "aggregation": [{ "type": "folder", "depth": 1 }] }
-      }
-    },
-    {
-      "domain_name": "testwork0",
-      "display_name": "testwork0",
-      "config": { "pageTitle": "testwork0", "baseUrl": "http://127.0.0.1:8766/testwork0", "graph": { ... } },
-      "layout": { ... }
+      "warnings": []
     }
   ]
 }
 ```
+
+**字段说明**：
+
+| 字段 | 说明 |
+|------|------|
+| `domain_name` | 域名（`settings/` 下的目录名） |
+| `display_name` | 显示名，取自 `configuration.pageTitle`，缺失时回落为域名 |
+| `page_title` / `base_url` | `configuration.pageTitle` / `configuration.baseUrl` 原值 |
+| `plugin_count` / `enabled_plugins` | `plugins` 段条目数 / `enabled` 条目的 `source` 列表 |
+| `aggregation` | `configuration.aggregation` 视图：`folder_depth` / `default` / `folders`（域没配则为 `null`） |
+| `warnings` | 结构校验告警（缺 `pageTitle`/`baseUrl`、`plugins` 缺 `source` 等） |
 
 ---
 
@@ -85,12 +121,15 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
 POST /api/domain/{domain}
 ```
 
-**请求体**（`config` 和 `layout` 都是可选的，未传则使用默认值）：
+配置**不是从零生成的**：整棵节点树继承 `server/config.json` 里的 `template_file`
+（默认 `settings/demo-region-sqlite/quartz.config.yaml`），只改写
+`configuration.pageTitle` 与 `configuration.baseUrl`。因此模板里的注释、锚点别名、插件清单与
+`layout:` 段会原样落到新域。
+
+**请求体**（白名单，可选，省略则用域名）：
 ```json
 {
-  "config": {
-    "pageTitle": "业务域1"
-  }
+  "page_title": "业务域1"
 }
 ```
 
@@ -98,19 +137,30 @@ POST /api/domain/{domain}
 ```bash
 curl -X POST "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"config": {"pageTitle": "业务域1"}}'
+  -d '{"page_title": "业务域1"}'
 ```
 
-**响应**（成功）：
+**响应**（成功，201）：
 ```json
 {
   "status": "Created",
   "domain": "xm1",
-  "message": "Domain created successfully"
+  "domain_info": {
+    "domain_name": "xm1",
+    "display_name": "业务域1",
+    "page_title": "业务域1",
+    "base_url": "localhost/xm1",
+    "config_format": "yaml",
+    "plugin_count": 55,
+    "enabled_plugins": ["..."],
+    "aggregation": { "folder_depth": 1, "default": ["type", "status", "category"], "folders": { "...": ["..."] } },
+    "warnings": []
+  },
+  "warnings": []
 }
 ```
 
-**响应**（域名已存在）：
+**响应**（域名已存在，409）：
 ```json
 {
   "error": "Domain 'xm1' already exists"
@@ -118,10 +168,11 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
 ```
 
 **说明**：
-- 域名从 URL 路径中获取，不再从 body 中传 `domain_name`
-- 自动创建 `input/xm1/` 和 `settings/xm1/` 目录
-- 自动生成默认的 `quartz.config.json`、`quartz.layout.json` 和 `index.md`
-- 可在 body 中传入 `config` 和/或 `layout` 覆盖默认值
+- 域名从 URL 路径获取；已存在直接 409（不会覆盖）
+- 自动创建 `input/xm1/` 与默认 `index.md`（已存在则不覆盖）
+- 只生成 `settings/xm1/quartz.config.yaml`
+- 未配置 `template_file` 时返回 500 并明确提示
+- 非白名单键（例如旧的 `{"config":{"pageTitle":...}}`）会被忽略并在 `warnings` 里列出
 
 ---
 
@@ -136,22 +187,12 @@ GET /api/domain/{domain}
 curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
 ```
 
-**响应**：
-```json
-{
-  "domain_name": "xm",
-  "display_name": "源悦知识库",
-  "config": {
-    "pageTitle": "源悦知识库",
-    "baseUrl": "http://127.0.0.1:8766/xm",
-    "graph": { "precomputeLocal": false, "localDepth": 1, "fallbackToBfs": false }
-  },
-    "layout": {
-      "backlinks": { "hideWhenEmpty": false, "aggregation": [{ "type": "folder", "depth": 1 }] },
-      "graph": { "aggregation": [{ "type": "folder", "depth": 1 }, { "type": "field", "field": "type" }] }
-    }
-}
-```
+**响应**：单个 `DomainMeta`，字段与「1. 列出所有业务域」里的 `domains[]` 元素完全一致
+（`domain_name` / `display_name` / `page_title` / `base_url` / `config_format` /
+`plugin_count` / `enabled_plugins` / `aggregation` / `warnings`）。
+
+**其它情况**：
+- 域目录里既没有 `quartz.config.yaml` 也没有 v4 JSON → `404`
 
 ---
 
@@ -159,41 +200,30 @@ curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
 
 ```
 PUT /api/domain/{domain}
-POST /api/domain/{domain}
 ```
 
-**请求体**（`config` 和 `layout` 都是可选的，`baseUrl` 由服务器自动生成，用户传入的值会被忽略）：
+**语义**：**只改请求体里出现的键**，没出现的键一律不动。
+
+| 键 | 类型 | 语义 |
+|----|------|------|
+| `page_title` | string | 写 `configuration.pageTitle` |
+| `aggregation.folder_depth` | int (>=1) | 写 `configuration.aggregation.folderDepth` |
+| `aggregation.default` | string[] | 写 `branches.default`；传 `[]` 表示**删除该键**（= 整域不做字段聚合） |
+| `aggregation.folders` | object | 逐目录写 `branches.folders.<目录>`；值为 `[]` 表示**删除该目录的覆盖**（恢复逐层继承） |
+
+目录级只有「配了字段」与「未配置」两态 —— 空数组等价于未配置，不存在「显式中断聚合」。
+
+**请求体示例**：
 ```json
 {
-  "config": {
-    "pageTitle": "新标题",
-    "graph": {
-      "tags": {
-        "color": "#ff0000",
-        "displayName": "标签"
-      }
-    }
-  },
-  "layout": {
-    "backlinks": {
-      "hideWhenEmpty": false,
-      "aggregation": {
-        "folder": {
-          "depth": 2,
-          "flatten": true
-        },
-        "fields": [
-          { "field": "date", "granularity": "year", "order": 1 }
-        ]
-      }
-    },
-    "graph": {
-      "aggregation": {
-        "folder": { "depth": 1, "flatten": true },
-        "fields": [
-          { "field": "type", "order": 1 }
-        ]
-      }
+  "page_title": "新标题",
+  "aggregation": {
+    "folder_depth": 2,
+    "default": ["type", "status", "category"],
+    "folders": {
+      "项目": ["阶段", "type", "status", "负责人"],
+      "问答": ["category", "status"],
+      "组织": []
     }
   }
 }
@@ -201,24 +231,33 @@ POST /api/domain/{domain}
 
 **请求示例**：
 ```bash
-# 只更新 pageTitle
+# 只改标题
 curl -X PUT "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"config": {"pageTitle": "新标题"}}'
+  -d '{"page_title": "新标题"}'
 
-# 只更新 layout
+# 只改聚合：新增「问答」、删除「组织」的覆盖、目录层级改 2
 curl -X PUT "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" \
   -H "Content-Type: application/json" \
-  -d '{"layout": {"backlinks": {"hideWhenEmpty": true}}}'
+  -d '{"aggregation": {"folder_depth": 2, "folders": {"问答": ["category", "status"], "组织": []}}}'
 ```
 
 **响应**：
 ```json
 {
   "status": "Saved",
-  "domain": "xm"
+  "domain": "xm",
+  "domain_info": { "...": "更新后的 DomainMeta" },
+  "warnings": ["请求体里的 \"nope\" 不在白名单内，已忽略"]
 }
 ```
+
+**说明**：
+- 写入是**节点级**的：只替换目标标量/序列节点，`quartz.config.yaml` 里的注释、锚点别名、键序、插件清单与 `layout:` 段全部保留。
+- 首次写入会做一次 YAML 风格归一化（Go emitter 把 flow 集合内侧空格去掉：`{ a: 1 }` → `{a: 1}`），内容零损失且幂等。
+- `baseUrl` 始终由服务端按 `{base_url}/{domain}` 注入。
+- 域没有 `quartz.config.yaml` → `500` 并提示配置不存在。
+- **改完必须带 `reset=true` 全量构建**，否则页面内嵌的图谱参数不会更新。
 
 ---
 
@@ -259,6 +298,99 @@ curl -X DELETE "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" 
 ```
 
 ---
+
+## 文件夹级配置 API
+
+在域级配置（`PUT /api/domain/{domain}`）之上，按**目录**维护该目录自己的覆盖值。覆盖的是两个同构的「链段」：
+
+| 链段 | 配置位置 | 语义 |
+|------|----------|------|
+| `aggregation` | `configuration.aggregation.branches.folders` | 该目录的**聚合字段链** |
+| `properties` | `plugins[note-properties-pro].options.properties.branches.folders` | 该目录**正文属性面板显示**的字段链 |
+
+目录级只有「配了字段」/「未配置」两态：未配置 → 逐层向上继承（最终用该链段的 `default`）。
+所以「恢复继承」= 删掉这一行 = 传 `fields: []`。
+
+### 1. 读
+
+```
+GET /api/domain/{domain}/_folder/{path...}
+```
+
+`{path...}` 是内容根相对的目录路径，**嵌套目录直接拼**（如 `任务/年度` → `.../_folder/任务/年度`）。
+
+响应：
+
+```json
+{
+  "domain": "demo-core",
+  "folder": "任务/年度",
+  "aggregation": {
+    "configured": false,
+    "fields": null,
+    "inherit_from": "任务",
+    "inherit_fields": ["status", "阶段", "级别"]
+  },
+  "properties": {
+    "configured": true,
+    "fields": ["status"],
+    "inherit_from": "任务",
+    "inherit_fields": ["status", "阶段", "级别", "负责人", "tags"]
+  },
+  "warnings": []
+}
+```
+
+- `configured` / `fields`：该目录**自己**配没配、配了什么（未配置为 `false` / `null`）。
+- `inherit_from` / `inherit_fields`：**删掉这一行之后会落到哪** —— 最近的已配置祖先，找不到就是 `default`。
+
+### 2. 写
+
+```
+PUT /api/domain/{domain}/_folder/{path...}
+```
+
+请求体（白名单只认 `aggregation` / `properties` 两个键）：
+
+```json
+{
+  "aggregation": { "fields": ["阶段", "type"] },
+  "properties": { "fields": ["status", "阶段"] }
+}
+```
+
+| 情况 | 行为 |
+|------|------|
+| 区块未出现 | 该区块**不动**（不会误清另一区块） |
+| `fields` 非空 | 写/覆盖该目录条目；数组顺序即字段优先级 |
+| `fields: []` | 删除该条目（= 恢复继承） |
+| 区块内缺 `fields` | 400 |
+| 写 `properties` 但域里没有 note-properties-pro 插件 | 409 |
+| 该插件 `includeAll: true`（与 properties 链互斥） | 400（先改 includeAll） |
+
+响应 200：与「读」同形（写完后立刻回读）+ `warnings`（未知键、构建校验结果）。
+
+### 3. 删
+
+```
+DELETE /api/domain/{domain}/_folder/{path...}
+```
+
+两个链段里该目录的条目都删（= 恢复继承）。
+
+### curl 示例
+
+```bash
+curl -X PUT "http://127.0.0.1:9766/api/domain/demo-core/_folder/任务/年度?user=admin&pwd=password123" \
+  -H "Content-Type: application/json" \
+  -d '{"aggregation": {"fields": ["阶段", "type"]}, "properties": {"fields": ["status"]}}'
+
+# 恢复继承
+curl -X DELETE "http://127.0.0.1:9766/api/domain/demo-core/_folder/任务/年度?user=admin&pwd=password123"
+```
+
+> 改了配置后**必须带 `reset=true` 全量重建**，页面里内嵌的构建期参数才会更新。
+> 面板「本目录聚合配置」的字段顺序可用本接口落盘（`fields` 数组顺序 = 链顺序），替代浏览器 localStorage。
 
 ## 构建 API
 
@@ -457,27 +589,10 @@ curl -X POST "http://127.0.0.1:8766/api/output/cleanup?user=admin&pwd=password12
 
 ---
 
-### 6. 传统构建端点（兼容）
+### 6. 传统构建端点（已删除）
 
-```
-POST /api/build
-```
-
-**查询参数**：
-
-| 参数 | 类型 | 说明 | 示例 |
-|------|------|------|------|
-| `domain` | string | 业务域名称 | `xm` |
-| `reset` | boolean | 是否重置后构建 | `true` |
-
-**请求示例**：
-```bash
-# 构建 xm 业务域（增量构建）
-curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=xm"
-
-# 重置后构建
-curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=xm&reset=true"
-```
+v4 时代的 `POST /api/build`（从 query 取 `domain`）**代码里从未注册过，已随 v4 模型一并删除**。
+构建请统一走 `POST /api/domain/{domain}/build`（见上文「构建 API」）。
 
 ---
 
@@ -507,31 +622,50 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 ## 配置数据结构
 
-### quartz.config.json
+### quartz.config.yaml（v5 域配置，唯一的一份）
 
-**注意**：`baseUrl` 由服务器根据 `config.json` 的 `base_url` + domain 自动生成，API 请求中传入的值会被忽略。
+**注意**：`configuration.baseUrl` 由服务端按 `{base_url}/{domain}` 注入，API 或手工传入的值都会被忽略/覆盖。
 
-```json
-{
-  "pageTitle": "源悦知识库",
-  "graph": {
-    "precomputeLocal": false,
-    "localDepth": 1,
-    "fallbackToBfs": false
-  }
-}
+```yaml
+configuration:
+  pageTitle: 示例业务域          # 作为 display name
+  baseUrl: localhost/demo-core   # 服务端注入
+  locale: zh-CN
+  aggregation:                   # 全站唯一的聚合规则（取代 v4 的 backlinks/graph.aggregation）
+    minGroupSize: 1
+    folderDepth: 1
+    branches:
+      default: [type, status, category]
+      folders:
+        项目: [阶段, type, status, 负责人]
+plugins:                         # 插件清单：source / enabled / options / order / layout
+  - source: ../plugins-local/graph-pro
+    enabled: true
+    options:
+      globalGraph:
+        folders: [项目, 组织]     # 全局图谱首屏大区白名单（取代 v4 的 coreNodeFilter/regionRules）
+    order: 55
+    layout: { position: right, priority: 10, component: Graph }
+layout:                          # 页型级布局调整
+  byPageType:
+    folder: { exclude: [backlinks], positions: { right: [] } }
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `pageTitle` | string | 页面标题/业务域显示名称 |
-| `graph.precomputeLocal` | boolean | 是否预计算局部图谱（默认 `false`） |
-| `graph.localDepth` | number | 局部图谱深度（默认 `1`） |
-| `graph.fallbackToBfs` | boolean | 是否回退到 BFS 算法（默认 `false`） |
+| 段 | 说明 |
+|----|------|
+| `configuration` | 站点配置。`pageTitle` / `baseUrl` / `locale` / `theme` / `ignorePatterns` / `aggregation` |
+| `configuration.aggregation` | 聚合规则：`minGroupSize`、`folderDepth`、`branches.{default,folders}`；目录级只有「配了字段」与「未配置」两态 |
+| `plugins[]` | 每个插件条目：`source` / `enabled` / `options` / `order` / `layout`（多组件插件需用 `layout.component` 指定导出名） |
+| `layout` | 页型级布局：`groups`（工具栏分组）与 `byPageType`（按页型 exclude 组件 / 清空栏位） |
 
-### quartz.layout.json（图谱扩展字段）
+> 局部图谱参数写在 `plugins[graph-pro].options.graph` / `.localGraph`，
+> 排序写在 `plugins[explorer-pro].options.sort`，聚合写在 `configuration.aggregation`。
 
-**注意**：`quartz.config.json` 与 `quartz.layout.json` 的变更**不会被增量构建自动识别**。修改后必须带 `reset=true` 触发全量重新构建，否则页面中嵌入的配置不会更新。
+### 图谱字段（plugins[graph-pro].options.globalGraph）
+
+下列全局图谱的规则名都写在 `plugins[graph-pro].options.globalGraph` 下。
+
+> **注意**：域配置的变更**不会被增量构建自动识别**。修改后必须带 `reset=true` 触发全量重新构建，否则页面中嵌入的配置不会更新。
 
 ```json
 {
@@ -579,9 +713,11 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 ---
 
-### quartz.layout.json
+### layout 段（v5 位于 `quartz.config.yaml` 的 `layout:`）
 
-**所有字段均为可选**，不传则使用前端默认值。反向链接和图谱**共用同一 `AggregationConfig` 结构**，均为 `AggregationRule[]` 规则列表，按数组顺序执行。
+**所有字段均为可选**，不写则用前端默认值。v5 的 `layout:` 只做页型级调整（`groups` / `byPageType`：
+按页型 exclude 组件或清空某栏位）；组件自己的排序、聚合、图谱参数都写在对应插件的 `options` 里。
+下表是 `plugins[<插件>].options.*` 下的字段（各插件的 options 结构）。
 
 ```json
 {
@@ -640,18 +776,26 @@ curl -X POST "http://127.0.0.1:8766/api/build?user=admin&pwd=password123&domain=
 
 **排序值相同时的处理（Tie-Breaker）**：当两个文件的主排序字段值相同时，系统会**隐式使用 `title` 的自然排序（natural asc）作为二次排序**。`title` 通常与文件名一致，因此可理解为"按文件名的自然升序"作为兜底规则。
 
-**不同文件夹使用不同排序逻辑**：`quartz.layout.json` 中的排序配置是全局的，但不同文件夹可以通过在各自文件的 frontmatter 中设置**同一排序字段的不同值**来实现差异化排序效果。例如全局配置 `"field": "priority"`，项目文件夹下的文件设置 `priority: 1, 2, 3...`，任务文件夹下的文件也设置各自的 `priority` 值，各自文件夹内即按该字段独立排序。
+**不同文件夹使用不同排序逻辑**：`plugins[explorer-pro].options.sort` 里的排序配置是全局的，但不同文件夹可以通过在各自文件的 frontmatter 中设置**同一排序字段的不同值**来实现差异化排序效果。例如全局配置 `"field": "priority"`，项目文件夹下的文件设置 `priority: 1, 2, 3...`，任务文件夹下的文件也设置各自的 `priority` 值，各自文件夹内即按该字段独立排序。
 
 > **注意**：`backlinks.aggregation` 与 `graph.aggregation` 共用完全相同的结构（`AggregationConfig`），均为规则列表。数组顺序即执行顺序，每条规则独立配置，按顺序依次对未聚合的叶子节点进行分组。不再使用 `order` 字段，也不再区分 `folder` 和 `fields` 两个独立配置块。
 
-### DomainInfo（API 响应结构）
+### DomainMeta（API 响应结构）
 
 ```typescript
-interface DomainInfo {
-  domain_name: string;     // 业务域标识（目录名）
-  display_name: string;    // 显示名称（从 pageTitle 获取）
-  config: QuartzConfig;   // quartz.config.json 内容
-  layout: QuartzLayout;  // quartz.layout.json 内容
+interface DomainMeta {
+  domain_name: string;       // 业务域标识（目录名）
+  display_name: string;      // 显示名，取自 configuration.pageTitle，缺失回落为域名
+  page_title: string;        // configuration.pageTitle 原值
+  base_url: string;          // configuration.baseUrl
+  plugin_count: number;      // plugins 段条目数
+  enabled_plugins: string[]; // enabled 条目的 source 列表
+  aggregation?: {            // configuration.aggregation 视图（域没配则为 null）
+    folder_depth: number;
+    default: string[];
+    folders: Record<string, string[]>;
+  };
+  warnings: string[];        // 结构校验告警 + v4 迁移提示
 }
 ```
 
@@ -662,23 +806,23 @@ interface DomainInfo {
 ```
 quartz-fullstack/
 ├── input/                    # Markdown 输入目录
-│   ├── xm/                   # xm 业务域输入
-│   └── xm1/                  # xm1 业务域输入
+│   └── xm/                   # xm 业务域输入
 ├── output/                   # 构建输出目录
-│   ├── xm/                   # xm 业务域输出（对应 /xm/ URL）
-│   └── xm1/                  # xm1 业务域输出（对应 /xm1/ URL）
-├── settings/                 # 配置目录
-│   ├── xm/                   # xm 业务域配置
-│   │   ├── quartz.config.json   # Quartz 配置
-│   │   └── quartz.layout.json    # Quartz 布局配置
-│   └── xm1/
+│   └── xm/                   # xm 业务域输出（对应 /xm/ URL）
+├── cache/                    # 构建缓存，每域一份：cache/xm/.quartz-cache.db（已 gitignore）
+├── settings/                 # 域配置目录
+│   └── xm/
+│       ├── quartz.config.yaml   # v5 域配置（唯一的一份）
+│       └── _v4-backup/          # v4 迁移留档（服务端不读）
+├── quartz5/                  # Quartz v5 前端引擎
+│   └── quartz/               # 引擎核心（bootstrap-cli.mjs 等）
+├── plugins-local/            # 本地插件源码
 ├── server/                   # 后端服务代码
 │   ├── main.go
 │   ├── api.go
-│   ├── static.go
+│   ├── v5config.go           # 域配置（YAML）节点级读写
 │   ├── domain_config.go      # 业务域管理
 │   └── config.json           # 后端服务配置
-└── client/                   # Quartz 前端代码
 ```
 
 ---
@@ -691,7 +835,7 @@ quartz-fullstack/
 {
   "version": "1.0.1",
   "listen_addr": "0.0.0.0:8766",
-  "base_url": "http://127.0.0.1:8766",
+  "base_url": "localhost",
   "optional_param": "reset",
   "forbidden_page": "401.html",
   "auth": {
@@ -702,7 +846,7 @@ quartz-fullstack/
     "cookie_max_age": 0
   },
   "command": {
-    "work_dir": "/path/to/quartz-fullstack/client",
+    "work_dir": "/path/to/quartz-fullstack/quartz5",
     "interpreter": "node",
     "interpreter_args": "--no-deprecation",
     "script": "./quartz/bootstrap-cli.mjs",
@@ -712,6 +856,8 @@ quartz-fullstack/
   "input_dir": "/path/to/quartz-fullstack/input",
   "output_dir": "/path/to/quartz-fullstack/output",
   "settings_dir": "/path/to/quartz-fullstack/settings",
+  "template_file": "/path/to/quartz-fullstack/settings/demo-region-sqlite/quartz.config.yaml",
+  "cache_dir": "/path/to/quartz-fullstack/cache",
   "compression": {
     "enabled": true,
     "level": 6,
@@ -734,6 +880,14 @@ quartz-fullstack/
   "cleanup_ignore": [".*", "*.gitkeep"]
 }
 ```
+
+本轮新增/变化的两项（下表同步）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `template_file` | string | 建域用的 v5 配置模板（`quartz.config.yaml`）。新域整棵继承它，只改写 `configuration.pageTitle` / `configuration.baseUrl`；未配置时 `POST /api/domain/{domain}` 报 500 |
+| `cache_dir` | string | 构建缓存根目录。服务端传给 `--cacheDir` 的是 `{cache_dir}/{domain}`，db 落在 `{cache_dir}/{domain}/.quartz-cache.db`。留空 = `{output_dir}/../cache`（即项目根 `cache/{domain}/`）；指到 settings 目录就是 `settings/{domain}/.quartz-cache.db`。**不能省**：quartz5 不接 `--cacheDir` 时会退回 `{CLI 工作目录}/data`（全域共用） |
+| `command.work_dir` | string | **已切到 `quartz5/`**（v4 时代指向 `client/`） |
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
