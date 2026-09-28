@@ -459,6 +459,19 @@ def _prefix_for_category(category: str) -> str:
     return {"组织": "org", "人员": "person", "项目": "proj", "任务": "task"}.get(category, "note")
 
 
+def _check_unique_content_names(file_plan: list, attachment_count: int, chart_count: int):
+    """内容页的文件名在整个业务域中唯一，避免 shortest 链接匹配到多个页面。"""
+    filenames = [f"{slug}.md" for _, _, slug in file_plan]
+    filenames.extend(f"附件-{i:03d}.md" for i in range(1, attachment_count + 1))
+    filenames.extend(f"chart-{i:03d}.md" for i in range(1, chart_count + 1))
+    seen = set()
+    for filename in filenames:
+        key = filename.casefold()
+        if key in seen or key == "index.md":
+            raise ValueError(f"生成计划包含重复的内容页文件名: {filename}")
+        seen.add(key)
+
+
 def generate_domain(project_root: str, domain: str, size: str, clean: bool, seed: int,
                     charts: int = -1, attachments: int = -1):
     random.seed(seed)
@@ -487,12 +500,16 @@ def generate_domain(project_root: str, domain: str, size: str, clean: bool, seed
         "组织": [], "人员": [], "项目": [], "任务": [], "附件": [], "图表": []
     }
     file_plan = []  # (leaf_path, seq, slug)
+    # 序号按分类全局连续分配，不能每个目录从 1 重计 —— 否则跨目录出现同名文件，
+    # Quartz shortest 链接解析要求同名唯一（匹配数 != 1 即解析失败 → 虚拟节点占位页）
+    cat_seq: dict[str, int] = {}
     for leaf_path in all_leaf_paths:
         category = _category_for_path(leaf_path.split("/"))
         count = leaf_counts[leaf_path]
         prefix = _prefix_for_category(category)
-        for i in range(1, count + 1):
-            seq = i
+        for _ in range(count):
+            seq = cat_seq.get(category, 0) + 1
+            cat_seq[category] = seq
             filename = f"{prefix}-{seq:05d}.md"
             slug = filename.replace(".md", "")
             file_plan.append((leaf_path, seq, slug))
@@ -500,6 +517,7 @@ def generate_domain(project_root: str, domain: str, size: str, clean: bool, seed
 
     chart_count = SIZE_CONFIG[size]["charts"] if charts < 0 else charts
     attachment_count = SIZE_CONFIG[size]["attachments"] if attachments < 0 else attachments
+    _check_unique_content_names(file_plan, attachment_count, chart_count)
 
     # 先生成附件与图表，这样普通文件的引用有目标可指
     if attachment_count > 0:

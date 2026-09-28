@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: {{ip}}/api/domain/demo-region/_folder/task?user=admin&pwd=password123
+  url: {{ip}}/api/domain/nest-small/_folder/任务?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -18,10 +18,15 @@ params:query {
 body:json {
   {
     "aggregation": {
-      "fields": ["阶段", "type"]
+      "fields": ["status",
+        "阶段",
+        "级别",
+        "负责人",
+        "tags"
+      ]
     },
     "properties": {
-      "fields": ["status"]
+      "fields": ["status", "项目"]
     }
   }
 }
