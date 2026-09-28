@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: {{ip}}/api/domain/demo-core/_folder/任务/年度?user=admin&pwd=password123
+  url: {{ip}}/api/domain/demo-region/_folder/task?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -26,20 +26,20 @@ body:json {
   }
 }
 
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
 docs {
   整体下发某目录的两个链段配置。
-
+  
   - 区块未出现 = 该区块不动（不会误清另一区块）
   - fields 非空 = 写/覆盖该目录条目（数组顺序即字段优先级，面板拖拽结果可直接落盘）
   - fields: [] = 删除该条目（= 恢复继承）
   - 区块内缺 fields → 400
   - 写 properties 但域里没有 note-properties-pro 插件 → 409
   - 该插件 includeAll: true 与 properties 链互斥 → 400
-
+  
   响应就是写完后立刻回读的目录状态（含 warnings）。
-}
-
-settings {
-  encodeUrl: true
-  timeout: 0
 }

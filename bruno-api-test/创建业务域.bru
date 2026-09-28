@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{ip}}/api/domain/demo-new?user=admin&pwd=password123
+  url: {{ip}}/api/domain/nest-small?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -21,28 +21,28 @@ body:json {
   }
 }
 
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
 docs {
   创建业务域（v5）。
-
+  
   配置不是从零生成的：整棵节点树继承 server/config.json 里的 template_file
   （默认 settings/demo-region-sqlite/quartz.config.yaml），只改写两个标量 ——
   configuration.pageTitle 与 configuration.baseUrl（= {base_url}/{domain}）。
   因此模板里的注释、锚点别名、插件清单与 layout 段会原样落到新域。
-
+  
   请求体是白名单，只认 page_title（string，省略则用域名）。
   其它键一律忽略，并在响应的 warnings 里逐条列出，不会静默丢弃。
-
+  
   响应 201：
     status=Created、domain_info（domain_name/display_name/page_title/base_url/
     config_format=yaml/plugin_count/enabled_plugins/aggregation/warnings）
-
+  
   其它行为：
   - 域名已存在 -> 409
   - 同时创建 input/{domain}/ 与默认 index.md（已存在则不覆盖）
   - 跑完请用「删除业务域」把 demo-new 清掉
-}
-
-settings {
-  encodeUrl: true
-  timeout: 0
 }

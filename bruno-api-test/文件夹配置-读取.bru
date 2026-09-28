@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{ip}}/api/domain/demo-core/_folder/任务/年度?user=admin&pwd=password123
+  url: {{ip}}/api/domain/demo-region/_folder/task?user=admin&pwd=password123
   body: none
   auth: inherit
 }
@@ -15,17 +15,17 @@ params:query {
   pwd: password123
 }
 
-docs {
-  读某目录在两个链段里的配置：aggregation（聚合字段链）+ properties（属性显示链）。
-
-  - configured / fields      该目录自己配没配、配了什么（未配置 = false / null）
-  - inherit_from / inherit_fields  删掉这一行后会落到哪（最近的已配置祖先，否则 default）
-
-  {path...} 是内容根相对路径，嵌套目录直接拼（任务/年度 → .../_folder/任务/年度）。
-  目录级只有「配了字段」/「未配置」两态，没有「显式不聚合」。
-}
-
 settings {
   encodeUrl: true
   timeout: 0
+}
+
+docs {
+  读某目录在两个链段里的配置：aggregation（聚合字段链）+ properties（属性显示链）。
+  
+  - configured / fields      该目录自己配没配、配了什么（未配置 = false / null）
+  - inherit_from / inherit_fields  删掉这一行后会落到哪（最近的已配置祖先，否则 default）
+  
+  {path...} 是内容根相对路径，嵌套目录直接拼（任务/年度 → .../_folder/任务/年度）。
+  目录级只有「配了字段」/「未配置」两态，没有「显式不聚合」。
 }

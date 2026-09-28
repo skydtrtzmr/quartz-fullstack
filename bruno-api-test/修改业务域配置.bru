@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: {{ip}}/api/domain/test1?user=admin&pwd=password123
+  url: {{ip}}/api/domain/demo-region?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -31,30 +31,30 @@ body:json {
   }
 }
 
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
 docs {
   修改业务域配置（v5，白名单补丁）。
-
+  
   **没出现在请求体里的键一律不动**；出现的键按下表语义写入 quartz.config.yaml：
-
+  
   | 键 | 语义 |
   |----|------|
   | page_title | 写 configuration.pageTitle |
   | aggregation.folder_depth | 写 configuration.aggregation.folderDepth（>= 1） |
   | aggregation.default | 写 branches.default；传 [] 表示删除该键（= 整域不做字段聚合） |
   | aggregation.folders | 逐目录写 branches.folders.<目录>；值为 [] 表示**删除该目录的覆盖**（恢复逐层继承） |
-
+  
   目录级只有「配了字段」与「未配置」两态：上面例子里「问答」被写入，「组织」被删除。
-
+  
   baseUrl 由服务端按 {base_url}/{domain} 注入，请求里传什么都不作数；
   非白名单键会被忽略，并在响应的 warnings 里逐条列出。
-
+  
   响应 200：status=Saved、domain_info（同 GET）、warnings[]。
   注意：改了配置后**必须带 reset=true 触发全量构建**，否则页面内嵌的图谱参数不会更新。
-
+  
   若该域没有 settings/{domain}/quartz.config.yaml，此接口返回 500。
-}
-
-settings {
-  encodeUrl: true
-  timeout: 0
 }
