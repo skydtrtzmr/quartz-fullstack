@@ -4,12 +4,31 @@
 
 用途：在 input/{domain}/ 下生成测试文件，覆盖排序、聚合、反向链接、图谱等功能验证。
 
-执行方式：
-    python scripts/generate_test_md.py --domain demo-region --profile region
-    python scripts/generate_test_md.py --domain demo-core --profile core
+域配置按 **v5 规则** 写入 settings/{domain}/quartz.config.yaml：
+整棵继承 server/config.json 的 template_file，只改写 pageTitle / baseUrl /
+configuration.aggregation / note-properties-pro 的属性链 / graph-pro 的
+globalGraph.{folders,coreNodeLimit}（见 scripts/v5_domain_config.py）。
+**不再**写 v4 的 quartz.config.json + quartz.layout.json。
+
+两个 profile（v4 概念在 v5 里的对应写法）：
+    region  大区模式：多个文件夹当首屏大区（globalGraph.folders = [项目, 组织]），
+                     目录字段链配得比较全 → 维度页/聚合分组更丰富
+    core    硬上限模式：单一大区（folders = [项目]）+ coreNodeLimit 收紧到 30，
+                     字段链精简
+
+用法：
+    python scripts/generate_test_md.py --domain demo-region --profile region --clean
+    python scripts/generate_test_md.py --domain demo-core --profile core --clean
+
+生成后构建（域配置改动过必须 --reset 全量重建）：
+    cd quartz5
+    npm run quartz -- build -d ../input/demo-region -o ../output/demo-region \\
+        --settings ../settings/demo-region --sqlite --cacheDir ../cache/demo-region --reset
 
 可选参数：
-    --clean    清空目标目录后重新生成
+    --clean       清空目标目录后重新生成（只清本域）
+    --clean-all   清理 input/ output/ settings/ 下所有其它域（递归删除，慎用）
+    --charts N    额外生成 N 个 echarts 图表样例（<domain>/图表/）
 """
 
 import os
@@ -18,6 +37,9 @@ import argparse
 import shutil
 import json
 from datetime import datetime, timedelta
+
+from v5_domain_config import build_command as build_v5_command
+from v5_domain_config import write_domain_config as write_v5_domain_config
 
 # ============ 配置 ============
 
@@ -247,79 +269,77 @@ LOREM_SENTENCES = [
     "本文档由自动化脚本生成，仅用于功能测试和性能基准测试。",
 ]
 
-# 两个业务域的 layout 配置模板
-LAYOUT_TEMPLATES = {
-    "region": {
-        "explorer": {
-            "sort": {"type": "natural", "order": "asc", "field": ""}
-        },
-        "folderPage": {
-            "sort": {"type": "natural", "order": "asc", "field": ""}
-        },
-        "backlinks": {
-            "hideWhenEmpty": False,
-            "aggregation": [
-                {"type": "folder", "depth": 1},
-                {"type": "field", "field": "type"},
-                {"type": "date", "field": "date", "granularity": "year"}
-            ]
-        },
-        "graph": {
-            "coreNodeFilter": [
-                {"type": "folder", "depth": 1, "values": ["项目"]}
-            ],
-            "coreNodeLimit": 50,
-            "regionRules": [{"type": "field", "field": "type"}],
-            "aggregation": [
-                {"type": "folder", "depth": 1},
-                {"type": "field", "field": "type"},
-                {"type": "date", "field": "date", "granularity": "year"}
-            ]
-        }
-    },
-    "core": {
-        "explorer": {
-            "sort": {"type": "date", "order": "desc", "field": "date"}
-        },
-        "folderPage": {
-            "sort": {"type": "date", "order": "desc", "field": "date"}
-        },
-        "backlinks": {
-            "hideWhenEmpty": False,
-            "sort": {"type": "priority", "order": "desc", "field": "priority"},
-            "aggregation": [
-                {"type": "folder", "depth": 1},
-                {"type": "field", "field": "status"}
-            ]
-        },
-        "graph": {
-            "coreNodeFilter": [
-                {
-                    "type": "folder",
-                    "depth": 1,
-                    "values": [
-                    "项目"
-                    ]
-                }
-            ],
-            "coreNodeLimit": 30,
-            "aggregation": [
-                {"type": "folder", "depth": 1},
-                {"type": "field", "field": "status"}
-            ]
-        }
-    }
-}
+# ============ v5 域配置（settings/{domain}/quartz.config.yaml）============
+#
+# v5 只认一份 YAML（configuration / plugins / layout 三段）；脚本不再写 v4 的
+# quartz.config.json + quartz.layout.json（服务端不读，写了只会污染 settings/）。
+#
+# v4 → v5 字段对应：
+#   graph.regionRules       → 首屏大区「恒为文件夹」，由 globalGraph.folders 指定
+#                             （旧写法 regionRules: [{type: field, field: type}] 已无对应键，
+#                               字段维度改由 configuration.aggregation 承担）
+#   graph.coreNodeFilter    → globalGraph.folders（values 直接变成 folders 列表），该键已删除
+#   graph.coreNodeLimit     → globalGraph.coreNodeLimit
+#   graph.aggregation       → configuration.aggregation
+#   backlinks.aggregation   → configuration.aggregation（全站一份，不再按组件各配一份）
+#   graph.precomputeLocal / localDepth → graph-pro 插件 options.graph（模板里已是 true / 1）
+#
+# 排序（explorer / folderPage 的 sort）在 v5 由 explorer-pro.options.sort 等组件选项承担，
+# 模板里的自然排序即 v4 region profile 的取值，故这里不再单独生成。
 
-# 在这里修改生成业务域的默认配置！
-DEFAULT_CONFIG = {
-    "pageTitle": "",
-    "baseUrl": "",
-    "graph": {
-        "precomputeLocal": True,
-        "localDepth": 1,
-        "fallbackToBfs": True
-    }
+# 属性面板显示链的公共部分（note-properties-pro.options.properties，与聚合链同构）
+_PROPERTIES_DEFAULT = ["date", "type", "status", "priority", "category", "tags"]
+
+DOMAIN_PROFILES = {
+    # 大区模式：多个文件夹当首屏大区，目录字段链配全 → 维度页 / 聚合分组更丰富
+    "region": {
+        "aggregation": {
+            "folder_depth": 1,
+            "default": ["type", "status", "category"],
+            "folders": {
+                "组织": ["type", "阶段"],
+                "人员": ["category", "type", "级别"],
+                "项目": ["阶段", "type", "status", "负责人"],
+                "任务": ["status", "阶段", "级别"],
+                "问答": ["category", "status"],
+            },
+        },
+        "properties": {
+            "folder_depth": 1,
+            "default": _PROPERTIES_DEFAULT,
+            "folders": {
+                "组织": ["type", "阶段", "tags"],
+                "人员": ["category", "type", "级别", "组织", "tags"],
+                "项目": ["阶段", "type", "status", "负责人", "tags"],
+                "任务": ["status", "阶段", "级别", "项目", "tags"],
+                "问答": ["category", "status", "项目", "任务", "tags"],
+            },
+        },
+        "graph_folders": ["项目", "组织"],
+        "graph_core_node_limit": 50,
+    },
+    # 硬上限模式：单一大区 + coreNodeLimit 收紧，字段链精简
+    "core": {
+        "aggregation": {
+            "folder_depth": 1,
+            "default": ["status"],
+            "folders": {
+                "项目": ["阶段", "status", "负责人"],
+                "任务": ["status", "项目"],
+            },
+        },
+        "properties": {
+            "folder_depth": 1,
+            "default": _PROPERTIES_DEFAULT,
+            "folders": {
+                "项目": ["阶段", "status", "负责人", "tags"],
+                "任务": ["status", "级别", "项目", "tags"],
+                "人员": ["category", "type", "级别", "组织", "tags"],
+            },
+        },
+        "graph_folders": ["项目"],
+        "graph_core_node_limit": 30,
+    },
 }
 
 
@@ -458,13 +478,6 @@ def generate_root_index_md(target_dir: str, domain: str):
     # 计算统计
     total = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
     
-    # 各分类的文件夹链接
-    folder_links = []
-    for cfg in FOLDER_CONFIGS:
-        folder_name = cfg["name"]
-        count = cfg["count"]
-        folder_links.append(f"- [[{folder_name}]] ({count} files)")
-    
     # 文件数量分布表格
     folder_stats_lines = []
     for cfg in FOLDER_CONFIGS:
@@ -514,10 +527,6 @@ title: "{domain}"
 |------|--------|------|--------|
 {chr(10).join(folder_stats_lines)}
 
-## 分类目录
-
-{chr(10).join(folder_links)}
-
 ## 文件树
 
 ```
@@ -542,30 +551,45 @@ title: "{domain}"
     print(f"  [index] {filepath}")
 
 
-def write_domain_config(project_root: str, domain: str, profile: str):
-    """生成业务域的配置文件"""
-    settings_dir = os.path.join(project_root, "settings", domain)
-    os.makedirs(settings_dir, exist_ok=True)
-
-    # quartz.layout.json
-    layout = LAYOUT_TEMPLATES.get(profile, LAYOUT_TEMPLATES["region"])
-    layout_path = os.path.join(settings_dir, "quartz.layout.json")
-    with open(layout_path, "w", encoding="utf-8") as f:
-        json.dump(layout, f, ensure_ascii=False, indent=2)
-    print(f"  [config] {layout_path}")
-
-    # quartz.config.json
-    config = dict(DEFAULT_CONFIG)
-    config["pageTitle"] = domain
-    config["baseUrl"] = f"http://127.0.0.1:8766/{domain}"
-    config_path = os.path.join(settings_dir, "quartz.config.json")
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"  [config] {config_path}")
+def write_domain_config(project_root: str, domain: str, profile: str) -> str:
+    """按 v5 规则生成 settings/{domain}/quartz.config.yaml（整棵继承建域模板）。"""
+    preset = DOMAIN_PROFILES[profile]
+    path = write_v5_domain_config(
+        project_root, domain,
+        aggregation=preset["aggregation"],
+        properties=preset["properties"],
+        graph_folders=preset["graph_folders"],
+        graph_core_node_limit=preset["graph_core_node_limit"],
+    )
+    print(f"  [config] {path}")
+    return path
 
 
 def clean_old_domains(project_root: str, keep_domains: set):
-    """清理 input、output、settings 下的旧业务域"""
+    """清理 input、output、settings 下的旧业务域。
+
+    ⚠️ 递归删除、不可恢复：只由 --clean-all 这一个显式开关把关；
+    删除前先把目标全量打印出来，便于在日志里留痕或及时中断。
+    """
+    doomed = []
+    for base in ["input", "output", "settings"]:
+        base_dir = os.path.join(project_root, base)
+        if not os.path.exists(base_dir):
+            continue
+        for name in os.listdir(base_dir):
+            if name in keep_domains:
+                continue
+            path = os.path.join(base_dir, name)
+            if os.path.isdir(path):
+                doomed.append((base, path))
+    if doomed:
+        print(f"[clean] --clean-all 将删除 {len(doomed)} 个目录"
+              f"（保留：{', '.join(sorted(keep_domains))}）：")
+        for base, path in doomed:
+            print(f"        [{base}] {path}")
+    else:
+        print("[clean] 没有需要清理的旧业务域")
+
     for base in ["input", "output", "settings"]:
         base_dir = os.path.join(project_root, base)
         if not os.path.exists(base_dir):
@@ -581,7 +605,7 @@ def clean_old_domains(project_root: str, keep_domains: set):
                         print(f"[skip] 权限不足，跳过删除 {path}")
 
 
-def generate_domain(project_root: str, domain: str, profile: str, clean: bool):
+def generate_domain(project_root: str, domain: str, clean: bool):
     target_dir = os.path.join(project_root, "input", domain)
 
     if clean and os.path.exists(target_dir):
@@ -751,10 +775,10 @@ def main():
     parser = argparse.ArgumentParser(description="批量生成测试 Markdown 文件")
     parser.add_argument("--domain", type=str, required=True, help="业务域名称，如 demo-region")
     parser.add_argument("--profile", type=str, choices=["region", "core"], required=True,
-                        help="配置模板：region（大区模式）或 core（硬上限模式）")
+                        help="配置模板：region（多文件夹大区 + 完整字段链）或 core（单一大区 + 硬上限）")
     parser.add_argument("--clean", action="store_true", help="清空目标目录后重新生成")
     parser.add_argument("--clean-all", action="store_true",
-                        help="清理所有旧业务域，只保留当前指定的业务域")
+                        help="清理 input/output/settings 下所有其它域（递归删除，慎用）")
     parser.add_argument("--charts", type=int, default=0,
                         help="额外生成 N 个图表样例文件（覆盖常见图表类型，放 <domain>/图表/）")
     parser.add_argument("--charts-only", action="store_true",
@@ -779,15 +803,17 @@ def main():
     if args.clean_all:
         clean_old_domains(project_root, keep_domains={args.domain})
 
-    # 生成配置文件
+    # 生成 v5 域配置（settings/{domain}/quartz.config.yaml）
     write_domain_config(project_root, args.domain, args.profile)
 
     # 生成 Markdown 文件
-    generate_domain(project_root, args.domain, args.profile, args.clean)
+    generate_domain(project_root, args.domain, args.clean)
 
     # 额外生成图表样例
     if args.charts > 0:
         generate_chart_files(target_dir, args.domain, args.charts)
+
+    print(f"[next] 域配置改动过必须全量重建，命令：{build_v5_command(args.domain)} --reset")
 
 
 if __name__ == "__main__":

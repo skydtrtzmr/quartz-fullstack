@@ -231,13 +231,27 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 
 ## 四、配置文件
 
+**唯一主配置（2026-09-29 收敛）**：`quartz5/` 下只保留「一份主配置 + 一份上游兜底」，不要再手工维护第二份镜像
+（历史上一度并存 4 份，见本节末尾"为什么不能再并存"）。
+
 | 文件 | 作用 |
 |------|------|
-| `quartz5/quartz.config.yaml` | 主配置：主题色(oceanColors)、locale(zh-CN)、插件清单、layout 位置 |
+| `quartz5/quartz.config.yaml` | **唯一主配置**：本地插件源（`../plugins-local/*-pro`）+ 社区插件 + 主题/locale/aggregation/layout；本地开发、构建、建域模板都用它 |
+| `quartz5/quartz.config.default.yaml` | 上游默认配置，**仅作 loader 回退/对照**（`config-loader.ts:78-84`：`quartz.config.yaml` 缺失时才用它；`plugin resolve/prune`、`install --from-config` 在 CI 无主配置时也回退到它）。不参与日常使用，不要拿它当配置改 |
 | `quartz5/quartz.lock.json` | 插件版本锁定（勿手改，由 plugin 命令维护） |
-| `quartz5/.quartz/plugins/` | 已安装插件（社区=实体目录，本地=symlink） |
+| `quartz5/.quartz/plugins/` | 已安装插件（社区=实体目录，本地=软链/junction） |
+| `settings/<domain>/quartz.config.yaml` | **业务域配置**（由 Go server 的建域/配置 API 读写），构建时用 `--settings` 指定；它不是主配置的副本 |
 
-改 YAML 后直接重新 build 即可生效，无需其他步骤。
+- 建域模板 = `server/config.json` 的 `template_file`，现指向 `quartz5/quartz.config.yaml`（新域整棵继承它，只改 `pageTitle` / `baseUrl`）。
+- 改主 YAML 后直接重新 build 即可生效；但**配置变更不会自动让 SQLite 构建缓存失效**，要看到差异请加 `--reset`。
+- 已删除（2026-09-29，用户确认不再需要）：`quartz5/quartz.config.github.yaml`（全 GitHub 源镜像）、
+  `quartz5/quartz.config.example.yaml`（demo-region-sqlite 域配置副本，其 graph-pro 调参已并入主配置）。
+
+> **为什么不能再并存两份"插件源不同"的配置**：插件解析位置只有 `.quartz/plugins/<name>` 一处，
+> 而两份配置里 13 个 `*-pro` 插件目录名完全相同 → 本地源条目会把克隆删掉换成软链，
+> github 源条目会把软链删掉重新 clone + install + build；任一步失败只打一行
+> `✗ Failed to install plugin` 就继续（构建仍然"成功"），表现为图谱空白/属性块不显示，
+> 而且"同名插件"实际跑的是另一份代码。残留情况见 §六 末段。
 
 ---
 
@@ -248,6 +262,9 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | `Found 0 input files` | glob 受仓库 `.gitignore` 的 `/input` 影响已修（glob.ts `gitignore: false`）；若复现，检查该补丁是否被 v5 升级覆盖 |
 | `plugin add` 报 build failed | Windows symlink 下安装器内 npm 不可靠；手动到 `plugins-local/<插件>` 跑 `npm install && npm run build` 即可 |
 | 插件改了没生效 | 忘了 `npm run build`（symlink 只同步源码目录，dist 需手动构建） |
+| **插件改了、dist 也重建了，站点行为还是旧的** | 三个前提缺一：① 插件 `dist/` 是新的；② `quartz5/.quartz/plugins/<name>` 是**指向 `plugins-local/<name>` 的链接**（不是实体目录）；③ 域名构建带 `--reset`。**根因**：域 YAML 里插件源若写成 `repo: github:...`（对象源），loader 会维护自己那份 clone，**并在构建中把 junction 换回实体目录** → 本地改动不参与打包。**修法**：该域插件源改 `../plugins-local/<name>` → `node scripts/setup-local-plugins.mjs --force` → `--reset` 构建。**判据**：`output/<domain>/static/scripts/script-*.js` 的**内容 hash 未变 = 没进产物**（可 `Select-String` 产物 grep 特征串核对） |
+| **构建日志长时间无输出，像卡死** | 任务日志（`server/logs/tasks/*.log`）是**缓冲后追加**的、不是流式。用 `GET /api/domain/<域>/status?user=…&pwd=…` 看状态、看构建进程 CPU 时间；等结束再读完整日志（实测 5m10s 的成功构建中途也没有输出） |
+| **一个域构建完，另一个域回到旧版行为** | 两个域共用 `quartz5/.quartz/plugins`：只要**任一域**的 YAML 仍是 `github:` 对象源，它的构建就会把本地链接换回 clone。建议所有域统一用 `../plugins-local/*`（本地开发形态），不要混用 |
 | `normalizeHastElement` 导入错误 | 根目录 `@quartz-community/utils` 版本漂移；`npm install @quartz-community/utils@^1.0.0` |
 | 输出页面按钮重复 | YAML 里新旧两个同类插件同时 enabled；把社区版改 `enabled: false` |
 | **插件组件不在同一行（掉出工具组）** | `plugin add` 自动追加的 YAML 条目缺 `group: toolbar`；手动补上该字段 |
@@ -280,6 +297,18 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | crawl-links-pro | submodule → github.com/skydtrtzmr/quartz-community_crawl-links，分支 `dev` | ✅ 可用（**正文**附件链接自动挂 `download`（另存名取链接文本、回退 basename）+ `data-router-ignore`；判定 = 带扩展名且非 `.md/.html/.htm`，可用 `attachmentExtensions` 收紧；社区版 crawl-links 已禁用） |
 | 社区 reader-mode / footer / content-index / search / explorer / note-properties / crawl-links | quartz-community | 已禁用（被对应的 pro 插件替代） |
 | 社区 graph | quartz-community | 已禁用（被 graph-pro 替代；`enabled: false`，避免同名 `Graph` 组件重复注册） |
+
+> **配置收敛（2026-09-29）**：`quartz5/` 只保留 `quartz.config.yaml`（唯一主配置，本地插件源）+
+> `quartz.config.default.yaml`（上游兜底/loader 回退名）。「全 GitHub 源」镜像 `quartz.config.github.yaml`
+> 与孤儿副本 `quartz.config.example.yaml` 已删除；`server/config.json` 的建域模板 `template_file`
+> 已改指主配置 → 新域一律继承本地插件源（**前提**：执行建域的机器上有 `plugins-local/` 且各插件 `dist/` 已构建）。
+> `server/v5config_test.go` 的 `TestObjectSourceConfig` 改为内联 fixture（不再依赖被删文件）。
+>
+> ⚠️ **残留风险（本轮未处理）**：`settings/demo-region/quartz.config.yaml` 与
+> `settings/nest-small/quartz.config.yaml` 仍是「本地路径源 + `repo/ref/name` 对象源」混合，
+> 表头注释也还写着"全 GitHub 源配置（服务器/新机器一键拉起用）"。它们与本地主配置共用同一个
+> `.quartz/plugins` 缓存 → 用 `--settings` 构建这两个域时仍会出现「软链 ↔ 克隆」互拆。
+> 要彻底消除需把这两份里的对象源统一改写为 `../plugins-local/<name>`（另开一轮；注意服务端 API 会读写这两份文件）。
 
 > **graph-pro 输出协议（第二步交互层与 per-domain 注入都要对齐，勿改）**：
 > - 局部图谱：`graph/local/{djb2(slug)[0:2]}/{djb2(slug)[2:4]}/{slug}.json`（每页一个，`djb2Hash` 与运行时读取端逐字符一致，单测 `test/graphLocal.test.ts` 覆盖）

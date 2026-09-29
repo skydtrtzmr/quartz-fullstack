@@ -11,7 +11,20 @@ uv run python scripts/generate_test_md.py --domain demo-region --profile region 
 
 uv run python .\scripts\pack-project.py
 
-注意，`generate_test_md.py` 会同时生成业务域配置文件（v4 风格）；`generate_nested_md.py` 只生成内容，不写配置，配置应通过产品 API 产生。
+# 生成 WTE 培训知识库业务域（设备 120 / 缺陷单 500 / 经验案例 200 / 培训课程 80 / 员工 60）
+python scripts/generate_train_md.py --domain wte-train --clean
+
+注意，`generate_test_md.py` / `generate_train_md.py` 会同时按 **v5 规则**生成业务域配置
+`settings/{domain}/quartz.config.yaml`（实现见 `scripts/v5_domain_config.py`）：整棵继承
+`server/config.json` 的 `template_file`，只改写 `pageTitle` / `baseUrl` /
+`configuration.aggregation` / `note-properties-pro` 的属性链 / `graph-pro` 的
+`globalGraph.{folders,coreNodeLimit}`，注释与 YAML 锚点原样保留；
+`generate_nested_md.py` 只生成内容，不写配置，配置应通过产品 API 产生。
+
+> ⚠️ `generate_test_md.py --clean-all` 会递归删掉 `input/`、`output/`、`settings/` 下所有其它域
+> （删除前会打印待删清单），非必要不要用。
+> 改了域配置必须加 `--reset` 全量重建，例如：
+> `cd quartz5 && npm run quartz -- build -d ../input/{domain} -o ../output/{domain} --settings ../settings/{domain} --sqlite --cacheDir ../cache/{domain} --reset`
 
 # 生成嵌套目录测试内容（多层子文件夹 + 每目录多字段 + echarts 样例 + 附件页）
 python scripts/generate_nested_md.py --domain nest-full --size full --clean

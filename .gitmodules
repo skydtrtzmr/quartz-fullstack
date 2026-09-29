@@ -57,3 +57,7 @@
 	path = plugins-local/echarts-pro
 	url = https://github.com/skydtrtzmr/quartz-community_echarts-pro.git
 	branch = dev
+[submodule "plugins-local/backlinks-pro"]
+	path = plugins-local/backlinks-pro
+	url = https://github.com/skydtrtzmr/quartz-community_backlinks
+	branch = dev

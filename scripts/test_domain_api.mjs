@@ -195,7 +195,10 @@ async function writeTempConfig() {
     input_dir: abs('input'),
     output_dir: path.join(TMP, 'output').replace(/\\/g, '/'),
     settings_dir: abs('settings'),
-    template_file: abs('settings/demo-region-sqlite/quartz.config.yaml'),
+    // 建域模板 = server/config.json 的 template_file。
+    // 默认即是唯一主配置 quartz5/quartz.config.yaml（插件源 ../plugins-local/*，走 junction → 离线、快、与生产同构）；
+    // 要换别的模板（例如某个现成域配置）用 TEST_TEMPLATE=<相对仓库根的路径> 覆盖。
+    template_file: abs(process.env.TEST_TEMPLATE || 'quartz5/quartz.config.yaml'),
     cache_dir: path.join(TMP, 'cache').replace(/\\/g, '/'),
     compression: {
       enabled: true,

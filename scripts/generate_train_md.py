@@ -13,23 +13,33 @@
   - frontmatter 数值指标字段（已处理缺陷/参与案例/主讲课程 等）
   - aliases 别名与重定向（设备编号 M-2026-xxxxx）
   - H2/H3 标题层级（使 ToC 有内容）
-  - 按"专业"大区聚合的图谱（regionRules: field 专业）
+  - 首屏大区 / 核心节点（graph-pro 的 globalGraph.folders = [设备]）
+  - 邻居分组与维度聚合页（configuration.aggregation 按"专业"等字段分组）
+
+域配置按 **v5 规则** 写入 settings/{domain}/quartz.config.yaml：
+整棵继承 server/config.json 的 template_file，只改写 pageTitle / baseUrl /
+configuration.aggregation / note-properties-pro 的属性链 / graph-pro 的
+globalGraph.folders（见 scripts/v5_domain_config.py）。**不再**写 v4 的
+quartz.config.json + quartz.layout.json。
 
 用法：
     python scripts/generate_train_md.py --domain wte-train --clean
 
-生成后构建（在 client 目录）：
-    node ./quartz/bootstrap-cli.mjs build -d ../input/wte-train -o ../output/wte-train \
-        --settings ../settings/wte-train --sqlite
+生成后构建（域配置改动过必须 --reset 全量重建）：
+    cd quartz5
+    npm run quartz -- build -d ../input/wte-train -o ../output/wte-train \
+        --settings ../settings/wte-train --sqlite --cacheDir ../cache/wte-train --reset
 """
 
 import os
 import random
 import argparse
 import shutil
-import json
 from datetime import datetime, timedelta
 from collections import defaultdict
+
+from v5_domain_config import build_command as build_v5_command
+from v5_domain_config import write_domain_config as write_v5_domain_config
 
 # ============ 域模型配置 ============
 
@@ -778,9 +788,6 @@ def generate_root_index_md(target_dir, domain):
         folder_stats_lines.append(
             f"| {cfg['name']} | {cfg['count']:>5} | {pct:>5.1f}% | `{bar}` |")
 
-    folder_links = "\n".join(
-        f"- [[{cfg['name']}]]（{cfg['count']} 个文件）" for cfg in FOLDER_CONFIGS)
-
     tree_lines = []
     for cfg in FOLDER_CONFIGS:
         tree_lines.append(f"{cfg['name']}/")
@@ -809,10 +816,6 @@ title: "{domain}"
 |------|--------|------|--------|
 {chr(10).join(folder_stats_lines)}
 
-## 分类目录
-
-{folder_links}
-
 ## 本域验证的功能点
 
 - **页嵌入** `![[x]]`：缺陷单嵌入设备卡片、课程嵌入教学案例
@@ -823,7 +826,8 @@ title: "{domain}"
 - **数值指标字段**：已处理缺陷 / 参与案例 / 主讲课程 / 学时
 - **aliases 别名**：设备编号（M-2026-xxxxx）与口语名
 - **标题层级**：H2 小节结构，右侧目录有内容
-- **专业大区图谱**：regionRules 按 `专业` 字段分区，设备为核心节点
+- **首屏大区 / 核心节点**：`globalGraph.folders: [设备]` → 设备文件夹为大区，设备为核心节点
+- **邻居分组 / 维度页**：`configuration.aggregation` 按 `专业` 等字段分组（目录树、图谱、维度页共用一份链）
 
 ## 文件树
 
@@ -840,56 +844,52 @@ title: "{domain}"
     print(f"  [index] {filepath}")
 
 
-# layout 配置（profile: wte —— 大区模式变体，按"专业"分区）
-LAYOUT_TEMPLATES = {
-    "wte": {
-        "explorer": {"sort": {"type": "natural", "order": "asc", "field": ""}},
-        "folderPage": {"sort": {"type": "date", "order": "desc", "field": "date"}},
-        "backlinks": {
-            "hideWhenEmpty": False,
-            "aggregation": [
-                {"type": "folder", "depth": 1},
-                {"type": "field", "field": "type"},
-            ],
-        },
-        "graph": {
-            "coreNodeFilter": [{"type": "folder", "depth": 1, "values": ["设备"]}],
-            "coreNodeLimit": 60,
-            "regionRules": [{"type": "field", "field": "专业"}],
-            "aggregation": [
-                {"type": "folder", "depth": 1},
-                {"type": "field", "field": "severity"},
-            ],
-        },
-    }
-}
+# ============ v5 域配置（settings/{domain}/quartz.config.yaml） ============
+#
+# v5 只认一份 YAML（configuration / plugins / layout 三段）；脚本不再写 v4 的
+# quartz.config.json + quartz.layout.json（服务端不读，写了只会污染 settings/）。
+#
+# v4 → v5 字段对应：
+#   graph.regionRules       → 首屏大区「恒为文件夹」，由 globalGraph.folders 指定
+#                             （旧写法 coreNodeFilter: values:["设备"] 改为 folders:[设备]）
+#   graph.coreNodeFilter    → 同上，该键已删除
+#   graph.aggregation       → configuration.aggregation
+#   backlinks.aggregation   → configuration.aggregation（全站一份，不再按组件各配一份）
+#   graph.coreNodeLimit     → globalGraph.coreNodeLimit
+#
+# 说明：原 v4 的 regionRules 是「按 专业 字段分区」，v5 首屏大区恒为「文件夹」，
+# 字段维度改由 configuration.aggregation 承担（图谱邻居分组 / 维度页 / 目录树共用同一份链）。
 
-DEFAULT_CONFIG = {
-    "pageTitle": "",
-    "baseUrl": "",
-    "graph": {
-        "precomputeLocal": True,
-        "localDepth": 1,
-        "fallbackToBfs": True,
+# 全站聚合链：设备为核心主体，邻居优先按专业分组
+AGGREGATION = {
+    "folder_depth": 1,
+    "default": ["专业", "type", "status"],
+    "folders": {
+        "设备": ["专业", "系统", "type", "status"],
+        "缺陷单": ["专业", "severity", "status", "type"],
+        "经验案例": ["专业", "type", "status"],
+        "培训课程": ["专业", "type", "status", "学时"],
+        "员工": ["专业", "部门", "type", "status"],
     },
 }
 
+# 正文属性面板的显示链（note-properties-pro.options.properties，与聚合链同构：
+# 链 = 有序白名单，链外字段仍可参与聚合，只是不在面板显示）
+PROPERTIES = {
+    "folder_depth": 1,
+    "default": ["date", "type", "status", "priority", "专业", "tags"],
+    "folders": {
+        "设备": ["专业", "系统", "type", "status", "tags"],
+        "缺陷单": ["专业", "severity", "status", "关联设备", "处理人", "tags"],
+        "经验案例": ["专业", "关联缺陷单", "关联设备", "参与员工", "status", "tags"],
+        "培训课程": ["专业", "学时", "讲师", "status", "tags"],
+        "员工": ["专业", "部门", "type", "status", "已处理缺陷", "tags"],
+    },
+}
 
-def write_domain_config(project_root, domain):
-    settings_dir = os.path.join(project_root, "settings", domain)
-    os.makedirs(settings_dir, exist_ok=True)
-
-    layout = LAYOUT_TEMPLATES["wte"]
-    with open(os.path.join(settings_dir, "quartz.layout.json"), "w", encoding="utf-8") as f:
-        json.dump(layout, f, ensure_ascii=False, indent=2)
-    print(f"  [config] {settings_dir}\\quartz.layout.json")
-
-    config = dict(DEFAULT_CONFIG)
-    config["pageTitle"] = domain
-    config["baseUrl"] = f"http://127.0.0.1:8766/{domain}"
-    with open(os.path.join(settings_dir, "quartz.config.json"), "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"  [config] {settings_dir}\\quartz.config.json")
+# 首屏大区 / 核心节点白名单：设备文件夹即大区，设备即核心节点
+GRAPH_FOLDERS = ["设备"]
+GRAPH_CORE_NODE_LIMIT = 60
 
 
 # ============ 主流程 ============
@@ -911,8 +911,15 @@ def main():
     os.makedirs(target_dir, exist_ok=True)
     print(f"[target] {target_dir}")
 
-    # 配置
-    write_domain_config(project_root, args.domain)
+    # v5 域配置：settings/{domain}/quartz.config.yaml
+    config_path = write_v5_domain_config(
+        project_root, args.domain,
+        aggregation=AGGREGATION,
+        properties=PROPERTIES,
+        graph_folders=GRAPH_FOLDERS,
+        graph_core_node_limit=GRAPH_CORE_NODE_LIMIT,
+    )
+    print(f"  [config] {config_path}")
 
     # 根 index
     generate_root_index_md(target_dir, args.domain)
@@ -961,9 +968,7 @@ def main():
     total = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
     print(f"[summary] 共生成 {total} 个 Markdown 文件（+{len(FOLDER_CONFIGS) + 1} 个 index.md）")
     print(f"[summary] 目录: {target_dir}")
-    print("[next] cd client && node ./quartz/bootstrap-cli.mjs build "
-          f"-d ../input/{args.domain} -o ../output/{args.domain} "
-          f"--settings ../settings/{args.domain} --sqlite")
+    print(f"[next] 域配置改动过必须全量重建，命令：{build_v5_command(args.domain)} --reset")
 
 
 if __name__ == "__main__":
