@@ -52,6 +52,16 @@ FOLDER_CONFIGS = [
     {"name": "问答", "prefix": "qa",    "count": 1000},
 ]
 
+# 人员姓名与文件编号分开生成，便于验证按 frontmatter 字段排序。
+PERSON_SURNAMES = [
+    "王", "李", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴",
+    "徐", "孙", "胡", "朱", "高", "林", "何", "郭", "马", "罗",
+]
+PERSON_GIVEN_NAMES = [
+    "伟", "芳", "娜", "敏", "静", "丽", "强", "磊", "军", "洋",
+    "勇", "艳", "杰", "娟", "涛", "明", "超", "秀英", "建华", "晓丽",
+]
+
 # 字段缺失率（用于测试聚合"有则有效无则跳过"）
 MISSING_RATE = {
     "type": 0.10,
@@ -284,8 +294,7 @@ LOREM_SENTENCES = [
 #   backlinks.aggregation   → configuration.aggregation（全站一份，不再按组件各配一份）
 #   graph.precomputeLocal / localDepth → graph-pro 插件 options.graph（模板里已是 true / 1）
 #
-# 排序（explorer / folderPage 的 sort）在 v5 由 explorer-pro.options.sort 等组件选项承担，
-# 模板里的自然排序即 v4 region profile 的取值，故这里不再单独生成。
+# 文件夹排序可通过 _folder 接口写入域 YAML 的 sort.field；此处不预设排序字段。
 
 # 属性面板显示链的公共部分（note-properties-pro.options.properties，与聚合链同构）
 _PROPERTIES_DEFAULT = ["date", "type", "status", "priority", "category", "tags"]
@@ -309,7 +318,7 @@ DOMAIN_PROFILES = {
             "default": _PROPERTIES_DEFAULT,
             "folders": {
                 "组织": ["type", "阶段", "tags"],
-                "人员": ["category", "type", "级别", "组织", "tags"],
+                "人员": ["姓名", "category", "type", "级别", "组织", "tags"],
                 "项目": ["阶段", "type", "status", "负责人", "tags"],
                 "任务": ["status", "阶段", "级别", "项目", "tags"],
                 "问答": ["category", "status", "项目", "任务", "tags"],
@@ -334,7 +343,7 @@ DOMAIN_PROFILES = {
             "folders": {
                 "项目": ["阶段", "status", "负责人", "tags"],
                 "任务": ["status", "级别", "项目", "tags"],
-                "人员": ["category", "type", "级别", "组织", "tags"],
+                "人员": ["姓名", "category", "type", "级别", "组织", "tags"],
             },
         },
         "graph_folders": ["项目"],
@@ -354,6 +363,13 @@ def maybe(value, missing_rate: float):
     if random.random() < missing_rate:
         return None
     return value
+
+
+def generate_person_names(count: int) -> list[str]:
+    names = [surname + given for surname in PERSON_SURNAMES for given in PERSON_GIVEN_NAMES]
+    if count > len(names):
+        raise ValueError(f"人员数量 {count} 超过可生成的不重复姓名数量 {len(names)}")
+    return random.sample(names, count)
 
 
 def build_frontmatter_lines(title: str, folder_name: str, extra_fields: dict) -> list:
@@ -662,13 +678,14 @@ def generate_domain(project_root: str, domain: str, clean: bool):
     person_records = file_records["人员"]
     person_path = os.path.join(target_dir, "人员")
     org_filenames = all_files["组织"]
-    for rec in person_records:
+    for rec, person_name in zip(person_records, generate_person_names(len(person_records))):
         org_file = maybe(random.choice(org_filenames), MISSING_RATE["organization"])
         extra = {}
         if org_file:
             org_name = org_file.replace(".md", "")
             extra["组织"] = org_name
         frontmatter = build_frontmatter_lines(rec["title"], "人员", extra)
+        frontmatter.insert(2, f'姓名: "{person_name}"')
         body = build_content(rec["title"], [])
         with open(os.path.join(person_path, rec["filename"]), "w", encoding="utf-8") as f:
             f.write("\n".join(frontmatter))

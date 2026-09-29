@@ -1,0 +1,34 @@
+meta {
+  name: 文件夹排序-恢复继承
+  type: http
+  seq: 19
+}
+
+put {
+  url: {{ip}}/api/domain/{{domain}}/_folder/{{folder}}?user=admin&pwd=password123
+  body: json
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+}
+
+body:json {
+  {
+    "sort": null
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  只删除当前文件夹的排序覆盖，不改 aggregation 和 properties。
+  配置仍保存在该业务域的 quartz.config.yaml；清除后按最近祖先、最后 default 继承。
+  如需同时清除该目录的三项覆盖，使用「文件夹配置-恢复继承」DELETE 请求。
+  修改后需重新构建该业务域。
+}

@@ -1,7 +1,7 @@
 meta {
   name: 文件夹配置-读取
   type: http
-  seq: 9
+  seq: 12
 }
 
 get {
@@ -21,11 +21,14 @@ settings {
 }
 
 docs {
-  读某目录在两个链段里的配置：aggregation（聚合字段链）+ properties（属性显示链）。
+  读某目录的 aggregation（聚合字段链）、properties（属性显示链）和 sort（统一排序字段）。
   
   - configured / fields      该目录自己配没配、配了什么（未配置 = false / null）
   - inherit_from / inherit_fields  删掉这一行后会落到哪（最近的已配置祖先，否则 default）
+  - sort.configured / sort.field  本目录是否覆盖排序、覆盖用的 frontmatter 字段
+  - sort.effective / sort.from  当前生效字段、来源目录（未命中则为 default）
   
   {path...} 是内容根相对路径，嵌套目录直接拼（任务/年度 → .../_folder/任务/年度）。
   目录级只有「配了字段」/「未配置」两态，没有「显式不聚合」。
+  sort 的默认字段是 title；子目录优先继承最近祖先的排序字段。
 }

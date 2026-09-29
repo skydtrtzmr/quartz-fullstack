@@ -1,11 +1,11 @@
 meta {
-  name: 访问业务域
+  name: 查询业务域配置
   type: http
-  seq: 14
+  seq: 8
 }
 
 get {
-  url: 127.0.0.1:8766/demo-region?user=admin&pwd=password123
+  url: {{ip}}/api/domain/{{domain}}?user=admin&pwd=password123
   body: none
   auth: inherit
 }
@@ -18,4 +18,5 @@ params:query {
 settings {
   encodeUrl: true
   timeout: 0
+  forwardAuthorizationHeader: false
 }

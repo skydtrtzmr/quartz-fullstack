@@ -122,7 +122,7 @@ POST /api/domain/{domain}
 ```
 
 配置**不是从零生成的**：整棵节点树继承 `server/config.json` 里的 `template_file`
-（默认 `settings/demo-region-sqlite/quartz.config.yaml`），只改写
+（本项目现指向 `quartz5/quartz.config.yaml`，即本地插件源的主配置），只改写
 `configuration.pageTitle` 与 `configuration.baseUrl`。因此模板里的注释、锚点别名、插件清单与
 `layout:` 段会原样落到新域。
 
@@ -856,7 +856,7 @@ quartz-fullstack/
   "input_dir": "/path/to/quartz-fullstack/input",
   "output_dir": "/path/to/quartz-fullstack/output",
   "settings_dir": "/path/to/quartz-fullstack/settings",
-  "template_file": "/path/to/quartz-fullstack/settings/demo-region-sqlite/quartz.config.yaml",
+  "template_file": "/path/to/quartz-fullstack/quartz5/quartz.config.yaml",
   "cache_dir": "/path/to/quartz-fullstack/cache",
   "compression": {
     "enabled": true,
