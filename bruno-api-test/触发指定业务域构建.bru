@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{ip}}/api/domain/test_asset/build?user=admin&pwd=password123&reset=true
+  url: {{ip}}/api/domain/{{domain}}/build?user=admin&pwd=password123&reset=true
   body: none
   auth: inherit
 }
@@ -17,7 +17,7 @@ params:query {
 }
 
 vars:pre-request {
-  domain: xm
+  domain: nest-small
 }
 
 settings {

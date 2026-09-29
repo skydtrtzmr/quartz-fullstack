@@ -5,7 +5,7 @@ meta {
 }
 
 put {
-  url: {{ip}}/api/domain/test_asset/_folder/附件?user=admin&pwd=password123
+  url: {{ip}}/api/domain/{{domain}}/_folder/{{folder}}?user=admin&pwd=password123
   body: json
   auth: inherit
 }
@@ -18,15 +18,14 @@ params:query {
 body:json {
   {
     "aggregation": {
-      "fields": ["status",
-        "阶段",
-        "级别",
+      "fields": ["阶段",
+        "type",
         "负责人",
-        "tags"
+        "status"
       ]
     },
     "properties": {
-      "fields": ["附件下载"]
+      "fields": ["负责人", "type", "status"]
     }
   }
 }
