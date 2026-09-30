@@ -17,8 +17,19 @@ params:query {
 
 body:json {
   {
+    "aggregation": {
+      "fields": ["阶段",
+        "type",
+        "负责人",
+        "status", "项目"
+      ]
+    },
     "properties": {
-      "fields": ["附件","附件下载", "附件下载链接", "附件链接"]
+      "fields": ["负责人", "type", "status"]
+    },
+    "sort": {
+      "field": "姓名",
+      "order": "desc"
     }
   }
 }
