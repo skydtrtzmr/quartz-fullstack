@@ -1,18 +1,17 @@
 meta {
   name: 前端界面
   type: http
-  seq: 15
+  seq: 11
 }
 
 get {
-  url: http://127.0.0.1:8766/demo-region?user=admin&pwd=password123
+  url: {{ip}}/{{domain}}?{{auth}}
   body: none
   auth: inherit
 }
 
 params:query {
-  user: admin
-  pwd: password123
+  "{{auth}}": 
 }
 
 settings {

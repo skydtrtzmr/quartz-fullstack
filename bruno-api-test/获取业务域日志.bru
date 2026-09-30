@@ -1,11 +1,11 @@
 meta {
   name: 获取业务域日志
   type: http
-  seq: 6
+  seq: 5
 }
 
 get {
-  url: 127.0.0.1:8766/api/domain/demo-core/logs?user=admin&pwd=password123
+  url: {{ip}}/api/domain/{{domain}}/logs?user=admin&pwd=password123
   body: none
   auth: inherit
 }

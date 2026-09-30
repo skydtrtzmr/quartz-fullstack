@@ -1,7 +1,7 @@
 meta {
   name: 文件夹配置-设置
   type: http
-  seq: 11
+  seq: 2
 }
 
 put {
@@ -25,10 +25,11 @@ body:json {
       ]
     },
     "properties": {
-      "fields": ["负责人", "type", "status"]
+      "fields": ["姓名","负责人", "type", "status"]
     },
     "sort": {
-      "field": "姓名"
+      "field": "姓名",
+      "order": "desc"
     }
   }
 }
@@ -39,14 +40,15 @@ settings {
 }
 
 docs {
-  局部更新某目录的聚合字段链、属性显示链和统一排序字段；实际写入该业务域的 quartz.config.yaml。
+  局部更新某目录的聚合字段链、属性显示链和统一排序规则；实际写入该业务域的 quartz.config.yaml。
   
   - 区块未出现 = 该区块不动（不会误清另一区块）
   - fields 非空 = 写/覆盖该目录条目（数组顺序即字段优先级，面板拖拽结果可直接落盘）
   - fields: [] = 删除该条目（= 恢复继承）
   - 区块内缺 fields → 400
-  - sort.field 是一个 frontmatter 字段名，目录树与文件夹页共同使用
-  - sort: null = 删除本目录的排序覆盖，恢复最近祖先或 default 的字段
+  - sort.field 是 frontmatter 字段名；sort.order 可选 asc/desc，省略时默认 asc
+  - 目录树与文件夹页共同使用字段和方向
+  - sort: null = 删除本目录的排序覆盖，恢复最近祖先或 default 的规则
   - 写 properties 但域里没有 note-properties-pro 插件 → 409
   - 该插件 includeAll: true 与 properties 链互斥 → 400
   

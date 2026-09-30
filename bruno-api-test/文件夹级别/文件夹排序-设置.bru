@@ -1,7 +1,7 @@
 meta {
   name: 文件夹排序-设置
   type: http
-  seq: 18
+  seq: 3
 }
 
 put {
@@ -18,7 +18,8 @@ params:query {
 body:json {
   {
     "sort": {
-      "field": "priority"
+      "field": "priority",
+      "order": "desc"
     }
   }
 }
@@ -29,13 +30,13 @@ settings {
 }
 
 docs {
-  只设置当前文件夹的排序字段，不改 aggregation 和 properties。
-  请求体中的 field 是 frontmatter 字段名；Go server 将其写入
+  只设置当前文件夹的排序规则，不改 aggregation 和 properties。
+  field 是 frontmatter 字段名；order 可选 asc/desc，省略时为 asc。Go server 将其写入
   settings/{domain}/quartz.config.yaml 的 configuration.listingSort.folders.{folder}。
   
-  目录树按该字段排序本目录的直接子项，文件夹页按同一字段排序列表。
+  目录树与文件夹页按相同字段和方向排序。
   子目录未设置时继承最近祖先；缺字段的条目排在有字段的条目之后。
   修改后需重新构建该业务域，静态页面和目录树配置才会更新。
   
-  响应 sort.configured / field 表示本目录覆盖；sort.effective / from 表示生效规则及来源。
+  响应 sort.configured / field / order 表示本目录覆盖；sort.effective / effective_order / from 表示生效规则及来源。
 }

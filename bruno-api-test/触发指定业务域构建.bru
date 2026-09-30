@@ -1,7 +1,7 @@
 meta {
   name: 触发指定业务域构建
   type: http
-  seq: 4
+  seq: 3
 }
 
 post {
@@ -14,10 +14,6 @@ params:query {
   user: admin
   pwd: password123
   reset: true
-}
-
-vars:pre-request {
-  domain: nest-small
 }
 
 settings {
