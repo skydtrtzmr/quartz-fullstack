@@ -295,7 +295,8 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | virtual-node-pro | submodule → github.com/skydtrtzmr/quartz-community_virtual-node-pro，分支 `dev`（**自研插件，无 upstream**；2026-09-21 转正） | ✅ 可用（v4 `VirtualNodePage` 迁移：**pageType 插件 + `generate()` 造虚拟页**，布局键 `virtual-node`；占位页与 v4 `virtualNodeIndex.json` 逐条一致） |
 | note-properties-pro | submodule → github.com/skydtrtzmr/quartz-community_note-properties，分支 `dev` | ✅ 可用（**frontmatter 值支持 HTML 锚点渲染**（HTML→HAST→JSX）+ 值里 `[[路径\|别名]]` / `[显示名](路径)` 命中附件则自动挂 `download` + `data-router-ignore`；新增 4 个选项 `htmlInProperties` / `downloadAttachments` / `attachmentExtensions` / `downloadNameFrom`；社区版 note-properties 已禁用） |
 | crawl-links-pro | submodule → github.com/skydtrtzmr/quartz-community_crawl-links，分支 `dev` | ✅ 可用（**正文**附件链接自动挂 `download`（另存名取链接文本、回退 basename）+ `data-router-ignore`；判定 = 带扩展名且非 `.md/.html/.htm`，可用 `attachmentExtensions` 收紧；社区版 crawl-links 已禁用） |
-| 社区 reader-mode / footer / content-index / search / explorer / note-properties / crawl-links | quartz-community | 已禁用（被对应的 pro 插件替代） |
+| folder-page-pro | submodule → github.com/skydtrtzmr/quartz-community_folder-page，分支 `dev`，upstream 已配 | ✅ 可用（文件夹页**文件列表**按 `configuration.listingSort` 排序：目录级 `field` + `order`、逐级向上继承；v4 日期兜底 `frontmatter[field]` → `dates[field]` → `dates.modified` → `dates.date`；比较器由 `config-loader` 按插件名注入 `options.sort`；pageType 仍为 `folder`） |
+| 社区 reader-mode / footer / content-index / search / explorer / note-properties / crawl-links / folder-page | quartz-community | 已禁用（被对应的 pro 插件替代） |
 | 社区 graph | quartz-community | 已禁用（被 graph-pro 替代；`enabled: false`，避免同名 `Graph` 组件重复注册） |
 
 > **配置收敛（2026-09-29）**：`quartz5/` 只保留 `quartz.config.yaml`（唯一主配置，本地插件源）+

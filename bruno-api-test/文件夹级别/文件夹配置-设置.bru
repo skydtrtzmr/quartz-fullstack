@@ -17,19 +17,8 @@ params:query {
 
 body:json {
   {
-    "aggregation": {
-      "fields": ["阶段",
-        "type",
-        "负责人",
-        "status", "项目"
-      ]
-    },
     "properties": {
-      "fields": ["姓名","负责人", "type", "status"]
-    },
-    "sort": {
-      "field": "姓名",
-      "order": "desc"
+      "fields": ["附件","附件下载", "附件下载链接", "附件链接"]
     }
   }
 }
@@ -53,4 +42,85 @@ docs {
   - 该插件 includeAll: true 与 properties 链互斥 → 400
   
   响应就是写完后立刻回读的目录状态（含 warnings）。
+}
+
+example {
+  name: 附件配置
+  
+  request: {
+    url: {{ip}}/api/domain/{{domain}}/_folder/{{folder}}?user=admin&pwd=password123
+    method: PUT
+    mode: json
+    params:query: {
+      user: admin
+      pwd: password123
+    }
+  
+    body:json: {
+      {
+        "properties": {
+          "fields": ["附件","附件下载", "附件下载链接", "附件链接"]
+        }
+      }
+    }
+  }
+  
+  response: {
+    headers: {
+      content-length: 239
+      connection: keep-alive
+      content-type: application/json
+      date: Wed, 30 Sep 2026 02:56:19 GMT
+      keep-alive: timeout=4
+      proxy-connection: keep-alive
+      vary: Accept-Encoding
+    }
+  
+    status: {
+      code: 200
+      text: OK
+    }
+  
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "test1",
+          "folder": "Assets",
+          "aggregation": {
+            "configured": false,
+            "fields": null,
+            "inherit_from": "default",
+            "inherit_fields": [
+              "type",
+              "status",
+              "category"
+            ]
+          },
+          "properties": {
+            "configured": true,
+            "fields": [
+              "附件",
+              "附件下载",
+              "附件下载链接",
+              "附件链接"
+            ],
+            "inherit_from": "default",
+            "inherit_fields": [
+              "type",
+              "status",
+              "priority",
+              "category",
+              "tags"
+            ]
+          },
+          "sort": {
+            "configured": false,
+            "effective": "title",
+            "from": "default"
+          }
+        }
+      '''
+    }
+  }
 }

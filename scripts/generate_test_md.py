@@ -294,7 +294,7 @@ LOREM_SENTENCES = [
 #   backlinks.aggregation   → configuration.aggregation（全站一份，不再按组件各配一份）
 #   graph.precomputeLocal / localDepth → graph-pro 插件 options.graph（模板里已是 true / 1）
 #
-# 文件夹排序可通过 _folder 接口写入域 YAML 的 sort.field；此处不预设排序字段。
+# 文件夹排序可通过 _folder 接口写入域 YAML 的 sort.field / sort.order；此处不预设排序规则。
 
 # 属性面板显示链的公共部分（note-properties-pro.options.properties，与聚合链同构）
 _PROPERTIES_DEFAULT = ["date", "type", "status", "priority", "category", "tags"]

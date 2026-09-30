@@ -61,3 +61,7 @@
 	path = plugins-local/backlinks-pro
 	url = https://github.com/skydtrtzmr/quartz-community_backlinks
 	branch = dev
+[submodule "plugins-local/folder-page-pro"]
+	path = plugins-local/folder-page-pro
+	url = https://github.com/skydtrtzmr/quartz-community_folder-page
+	branch = dev
