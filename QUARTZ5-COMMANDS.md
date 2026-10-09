@@ -200,7 +200,6 @@ npx quartz build -d ../input/demo-bench -o ../output/demo-bench
 
 - Go server 自带静态站点适配：domain 前缀剥离、无扩展名 `.html` 回退、目录 index.html、尾斜杠 301
 - **产物兼容性已验证（2026-09-19）**：v5 产物（含全部核心补丁）在 Go server 上全链路正常
-- 注意：Go server 的 `config.json` 构建命令目前仍指向 v4 client——通过 API 触发的构建还是 v4；手动构建 v5 产物放对目录即可被 serve
 
 ### 方式 B：quartz 内置 serve（插件开发快速迭代用）
 
@@ -477,3 +476,56 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 - 全局图谱：`graph/global/graphGlobal.json`（含 `firstScreen` / `aggNodes` / `regionNodes` / `adjacency`）
 - 取不到时按 v4 逻辑回退到 `fetchData` + 运行时计算（站点不会因此不可用）
 - 构建日志核对点：`[Step 7] Agg nodes: N`、`[Step 8] Region nodes: N`、`[GraphGlobal] Output: ...KB, X first-screen, Y agg, Z region`
+
+---
+
+## 十、生产部署（Windows Server）
+
+> 目标：把 quartz5 站点部署到生产 Win Server。**生产不访问 GitHub**，只访问 npm registry。
+> 部署包只含 `quartz5/` + `plugins-local/` 两块，外加一键部署脚本；**包内全局不含任何 `node_modules`**。
+
+### 1. 打包（开发机）
+
+```powershell
+cd E:\ProgramProjects\VScode_projects\quartz-fullstack
+python scripts\pack-project.py
+```
+
+- 输出 `quartz-deploy-<时间戳>.zip`（zip 内统一前缀 `quartz-fullstack/`）。
+- 打包规则：
+  - 全局剔除 `node_modules/`（含 quartz5 与各插件的）。
+  - `quartz5/.quartz/plugins/<社区插件>/`：**保留 `.git`（浅克隆）+ `dist`**、剔除 `node_modules` → 生产免 GitHub。
+  - `quartz5/.quartz/plugins/<本地插件>/`：**不进包**（开发机那是指向 `plugins-local` 的链接）→ 生产用部署脚本重建。
+  - `plugins-local/<插件>/`：保留源码 + `dist`、剔除 `node_modules` 与 `.git`。
+- **打包前校验**：本地插件缺 `dist`、社区插件缺 `dist` 或 `.git` 会告警——这些会导致生产**静默缺插件**，出现告警先补齐再打包。
+
+### 2. 一键部署（生产）
+
+解压后，在包根执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+# 强制重装基座依赖：加 -Force
+```
+
+它只做三件事：校验 Node（>= 22）→ `quartz5` 下 `npm ci` → 为本地插件建立免特权 junction（复用 `scripts/setup-local-plugins.mjs --link-only`）。
+**不含站点构建与 Go server 启动**（由运维 / server 触发）。
+
+> ⚠️ 该脚本刻意写成**纯 ASCII**：Windows PowerShell 5.1 在 `.ps1` 无 BOM 时按系统 ANSI（GBK）码页读取，中文字符会被解码错乱、直接导致语法解析失败。以后往这个脚本加内容也要保持 ASCII。
+
+### 3. 三条硬约束（改打包/部署前务必遵守）
+
+1. **包内全局不得有 `node_modules`**；quartz5 依赖由生产 `npm ci` 现装（仅走 registry）。
+2. **社区插件必须带 `.git` + `dist`**：loader 用 `git.resolveRef(dir,"HEAD")` 判「已安装」（`gitLoader.ts:499-504`），缺 `.git` 会 `git clone` 回 GitHub（生产不可达 → 失败）。
+3. **本地插件必须靠 junction 接入**：loader 只认「指向 `plugins-local/<name>` 的链接」（`gitLoader.ts:441-450`）；实体目录会被 `fs.rmSync` 删除并重建 `symlinkSync(...,"dir")`（Win 非管理员 EPERM，失败被 catch 后仅告警继续 → 静默失效）。
+
+> 构建期**不需要**插件自己的 `node_modules`：客户端脚本依赖已在插件自身 tsup 构建期内联进 `dist`，站点构建期 esbuild 均 `packages:"external"`、不解析裸包。
+
+### 4. 后续（不在脚本范围）
+
+```powershell
+cd quartz5
+npm run quartz -- build -d ../input/<域> -o ../output/<域> --settings ../settings/<域> --sqlite --cacheDir ../cache/<域>
+```
+
+Go server 启动按既有 server 流程执行。
