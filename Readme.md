@@ -49,7 +49,7 @@ cd quartz5
 npm run quartz -- build -d ../input/<domain> -o ../output/<domain> --settings ../settings/<domain> --sqlite --cacheDir ../cache/<domain>
 ```
 
-再按「服务端」流程启动 Go 服务。
+再启动服务端（在 `server\` 下）：把 `config_example.json` 复制为 `config.json`，按生产实际路径/密码改好后运行 `quartz-service.exe`。
 
 ### 包内容边界
 
@@ -59,7 +59,8 @@ npm run quartz -- build -d ../input/<domain> -o ../output/<domain> --settings ..
 | `plugins-local/` | ✅ | 本地插件，仅 `dist` + `package.json` |
 | `scripts/deploy.ps1`、`scripts/setup-local-plugins.mjs` | ✅ | 一键部署入口 |
 | 社区插件（`quartz5/.quartz/plugins/<name>/`） | ✅ | 随包携带 `.git` + `dist`，生产无需连 GitHub 即可复用 |
-| `server/`、`settings/`、`input/`、`output/`、`cache/` | ❌ | 不在包内，另行提供 |
+| `server/`（仅 `*.exe`、`401.html`、`config_example.json`） | ✅ | 服务端运行件；不含源码/日志 |
+| `input/`、`output/`、`settings/`、`cache/` 四目录 | 占位 | 仅含 `.gitkeep` 占位（保证解压后目录存在），实际内容另行准备 |
 
 ---
 

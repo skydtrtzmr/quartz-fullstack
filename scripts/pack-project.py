@@ -2,7 +2,7 @@
 """
 打包 quartz5 生产部署包（zip）。
 
-只包含两块内容 + 一键部署入口脚本：
+包含四块内容 + 一键部署入口脚本：
   - quartz5/        基座源码
       · 全局剔除 node_modules；排除上游 .github 与仓库自身的 .git（生产不需要）
       · .quartz/plugins/<社区插件>/ ：保留 .git（浅克隆，离线复用必需）+ dist；
@@ -10,11 +10,16 @@
       · .quartz/plugins/<本地插件>/ ：跳过（开发机上是指向 plugins-local 的链接，生产由部署脚本重建）
   - plugins-local/  本地插件 dist + package.json（剔除 node_modules、.git
                     及 src/、test/、构建配置、*.map 等开发产物）
+  - server/         仅部署所需的最小集合（白名单）：*.exe + 401.html + config_example.json
+                    （不含源码/日志；运行所需的 input、settings、output、cache 目录需另行准备内容）
+  - 内容目录骨架    input/、output/、settings/、cache/ 四目录：仅纳入占位 .gitkeep
+                    （保证解压后目录存在；四目录内的实际内容不打包）
   - scripts/deploy.ps1、scripts/setup-local-plugins.mjs（一键部署所需）
 
 打包前校验（缺失只告警、不中断）：
   - 每个 plugins-local/<name> 必须有 dist/
   - 每个社区插件 quartz5/.quartz/plugins/<name> 必须有 dist/ 与 .git/
+  - server/ 至少有一个 *.exe，且存在 401.html、config_example.json
 
 输出：quartz-deploy-<timestamp>.zip（zip 内统一前缀 quartz-fullstack/）
 
@@ -32,12 +37,20 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 QUARTZ5_DIR = PROJECT_ROOT / "quartz5"
 PLUGINS_LOCAL_DIR = PROJECT_ROOT / "plugins-local"
 PLUGINS_CACHE_DIR = QUARTZ5_DIR / ".quartz" / "plugins"
+SERVER_DIR = PROJECT_ROOT / "server"
 
-# 除两大块外，额外定向纳入的部署脚本（一键部署必需）
+# 除四大块外，额外定向纳入的部署脚本（一键部署必需）
 EXTRA_FILES = [
     "scripts/deploy.ps1",
     "scripts/setup-local-plugins.mjs",
 ]
+
+# 四个必须的内容目录：只纳入其占位 .gitkeep（内容不打包）
+CONTENT_DIRS = ["input", "output", "settings", "cache"]
+
+# server/ 只纳入部署所需的最小集合（白名单）
+SERVER_KEEP_NAMES = {"401.html", "config_example.json"}
+SERVER_KEEP_SUFFIXES = (".exe",)
 
 # 任意层级都剔除的目录名
 #   .github = 上游仓库 CI/Issue 模板，构建与运行均不读取
@@ -152,6 +165,24 @@ def walk_files(root, keep_dot_git, local_names, slim_local=False, slim_community
             yield here / fn
 
 
+def collect_server():
+    """server/ 仅纳入白名单文件：*.exe + 401.html + config_example.json。"""
+    files = []
+    if not SERVER_DIR.is_dir():
+        return files
+    for dirpath, dirnames, filenames in os.walk(SERVER_DIR):
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in PRUNE_DIR_NAMES and not (Path(dirpath) / d).is_symlink()
+        ]
+        for fn in filenames:
+            if fn in SERVER_KEEP_NAMES or fn.endswith(SERVER_KEEP_SUFFIXES):
+                p = Path(dirpath) / fn
+                files.append((p, p.relative_to(PROJECT_ROOT)))
+    return files
+
+
 def collect(local_names):
     files = []
     for p in walk_files(
@@ -162,6 +193,15 @@ def collect(local_names):
         PLUGINS_LOCAL_DIR, keep_dot_git=False, local_names=local_names, slim_local=True
     ):
         files.append((p, p.relative_to(PROJECT_ROOT)))
+    files.extend(collect_server())
+    # 四个必须的内容目录：纳入其占位 .gitkeep，保证解压后目录骨架存在；
+    # dev 上缺失时补一个空占位（full 为 None，写包时用空内容）。
+    for d in CONTENT_DIRS:
+        p = PROJECT_ROOT / d / ".gitkeep"
+        if p.is_file():
+            files.append((p, p.relative_to(PROJECT_ROOT)))
+        else:
+            files.append((None, Path(d) / ".gitkeep"))
     for rel in EXTRA_FILES:
         p = PROJECT_ROOT / rel
         if p.is_file():
@@ -186,17 +226,29 @@ def precheck(local_names, community_dirs):
             warns.append(f"社区插件缺 dist/：.quartz/plugins/{d.name}/dist（生产会静默缺该插件）")
         if not (d / ".git").exists():
             warns.append(f"社区插件缺 .git/：.quartz/plugins/{d.name}/.git（生产会尝试 clone GitHub）")
+
+    if not SERVER_DIR.is_dir():
+        warns.append("缺少 server/ 目录（将不含服务端）")
+    else:
+        if not any(SERVER_DIR.rglob("*.exe")):
+            warns.append("server/ 未找到 *.exe（生产无法直接启动服务端，请先 go build）")
+        for f in sorted(SERVER_KEEP_NAMES):
+            if not (SERVER_DIR / f).is_file():
+                warns.append(f"server/{f} 缺失（部署所需）")
     return warns
 
 
 def main():
     local_names = local_plugin_names()
     community = community_plugin_dirs(local_names)
+    server_files = collect_server()
 
     print(f"项目根        : {PROJECT_ROOT}")
     print(f"输出文件      : {OUT_FILE}")
     print(f"本地插件({len(local_names)})   : {', '.join(sorted(local_names)) or '(无)'}")
     print(f"社区插件({len(community)})   : {', '.join(d.name for d in community) or '(无)'}")
+    print(f"服务端文件({len(server_files)})   : {', '.join(p.name for _, p in server_files) or '(无)'}")
+    print(f"内容目录占位  : {', '.join(d + '/.gitkeep' for d in CONTENT_DIRS)}")
 
     warns = precheck(local_names, community)
     if warns:
@@ -216,7 +268,11 @@ def main():
 
     with zipfile.ZipFile(OUT_FILE, "w", zipfile.ZIP_DEFLATED) as zf:
         for full, rel in files:
-            zf.write(full, ZIP_PREFIX + rel.as_posix())
+            arc = ZIP_PREFIX + rel.as_posix()
+            if full is None:  # 合成的空占位（如缺失的 .gitkeep）
+                zf.writestr(arc, "")
+            else:
+                zf.write(full, arc)
 
     size_mb = OUT_FILE.stat().st_size / (1024 * 1024)
     print(f"\n完成！{OUT_FILE.name}（{size_mb:.2f} MB，{total} 个文件）")
