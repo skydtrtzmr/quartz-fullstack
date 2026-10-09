@@ -6,12 +6,69 @@
 
 ---
 
+## 生产部署（Windows Server）
+
+> 一键流程：**打包 → 解压 → `deploy.ps1`**。全程**不需要访问 GitHub**（社区插件随包携带，本地插件部署时只建 junction）；仅首次安装依赖需要能访问 **npm registry**。
+>
+> 前置要求：目标服务器已安装 **Node ≥ 22**（含 npm）。
+
+### 步骤
+
+**1. 开发机打包**（在项目根目录执行）
+
+```
+python scripts\pack-project.py
+```
+
+生成 `quartz-deploy-<时间戳>.zip`，内含：`quartz5/`（引擎源码，剔除 `node_modules`）、`plugins-local/`（本地插件 `dist` + `package.json`）、`scripts/deploy.ps1` 与 `scripts/setup-local-plugins.mjs`。
+
+**2. 拷贝并解压到目标服务器**
+
+把 zip 拷到 Windows Server 并解压（zip 内统一前缀 `quartz-fullstack/`），得到 `<目标目录>\quartz-fullstack\`。
+
+**3. 一键环境准备**（在解压出的 `quartz-fullstack\` 目录下执行）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+```
+
+该脚本只做三件事（**不构建站点、不启动服务**）：
+
+1. 校验运行时（Node ≥ 22 / npm）；
+2. 在 `quartz5\` 下执行 `npm ci`（仅访问 npm registry）；
+3. 为 `plugins-local\` 建立目录 junction（无需管理员权限，供 loader 复用）。
+
+> 重复部署时，若 `quartz5\node_modules` 已存在会跳过 `npm ci`；要强制重装加 `-Force`。
+
+**4. 部署后（`deploy.ps1` 范围之外）**
+
+构建某个业务域：
+
+```
+cd quartz5
+npm run quartz -- build -d ../input/<domain> -o ../output/<domain> --settings ../settings/<domain> --sqlite --cacheDir ../cache/<domain>
+```
+
+再按「服务端」流程启动 Go 服务。
+
+### 包内容边界
+
+| 内容 | 是否随包 | 说明 |
+|:---|:---|:---|
+| `quartz5/` | ✅ | 引擎源码（无 `node_modules`） |
+| `plugins-local/` | ✅ | 本地插件，仅 `dist` + `package.json` |
+| `scripts/deploy.ps1`、`scripts/setup-local-plugins.mjs` | ✅ | 一键部署入口 |
+| 社区插件（`quartz5/.quartz/plugins/<name>/`） | ✅ | 随包携带 `.git` + `dist`，生产无需连 GitHub 即可复用 |
+| `server/`、`settings/`、`input/`、`output/`、`cache/` | ❌ | 不在包内，另行提供 |
+
+---
+
 构建命令（v5，引擎在 `quartz5/`）：
 
 ```
 cd E:\ProgramProjects\VScode_projects\quartz-fullstack\quartz5
 
-npx quartz build -d ../input/demo-region -o ../output/demo-region-sqlite --settings ../settings/demo-region-sqlite --sqlite --cacheDir ../cache/demo-region-sqlite
+npm run quartz -- build -d ../input/demo-region -o ../output/demo-region-sqlite --settings ../settings/demo-region-sqlite --sqlite --cacheDir ../cache/demo-region-sqlite
 ```
 
 ## 项目文件夹结构
@@ -94,13 +151,8 @@ go test ./...
 
 详见 `document/API文档.md`（接口契约）与 `document/Settings目录说明.md`（配置模型）。
 
-### 打包
+### 首次访问
 
-```
-python .\scripts\pack-project.py
-```
-
-首次访问：
 http://127.0.0.1:8766/demo-core?user=admin&pwd=password123
 http://127.0.0.1:8766/demo-region?user=admin&pwd=password123
 http://127.0.0.1:9766/demo-bench1?user=admin&pwd=password123

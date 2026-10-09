@@ -3,10 +3,13 @@
 打包 quartz5 生产部署包（zip）。
 
 只包含两块内容 + 一键部署入口脚本：
-  - quartz5/        基座源码（全局剔除 node_modules）
-      · .quartz/plugins/<社区插件>/ ：保留 .git（浅克隆，离线复用必需）+ dist，剔除 node_modules
+  - quartz5/        基座源码
+      · 全局剔除 node_modules；排除上游 .github 与仓库自身的 .git（生产不需要）
+      · .quartz/plugins/<社区插件>/ ：保留 .git（浅克隆，离线复用必需）+ dist；
+                                     剔除 node_modules 及 src/、test/、*.map 等开发产物
       · .quartz/plugins/<本地插件>/ ：跳过（开发机上是指向 plugins-local 的链接，生产由部署脚本重建）
-  - plugins-local/  本地插件源码 + dist（剔除 node_modules 与 .git）
+  - plugins-local/  本地插件 dist + package.json（剔除 node_modules、.git
+                    及 src/、test/、构建配置、*.map 等开发产物）
   - scripts/deploy.ps1、scripts/setup-local-plugins.mjs（一键部署所需）
 
 打包前校验（缺失只告警、不中断）：
@@ -37,14 +40,49 @@ EXTRA_FILES = [
 ]
 
 # 任意层级都剔除的目录名
-PRUNE_DIR_NAMES = {"node_modules"}
+#   .github = 上游仓库 CI/Issue 模板，构建与运行均不读取
+PRUNE_DIR_NAMES = {"node_modules", ".github"}
 # 剔除的文件名（submodule 的 .git 是指针文件）与后缀
 PRUNE_FILE_NAMES = {".git"}
 PRUNE_FILE_SUFFIXES = (".log", ".stackdump")
 
+# 插件开发产物（本地插件与社区插件在生产均不构建、只运行其 dist，
+# 故源码 / 测试 / 构建配置 / 源码映射等一律剔除，不影响构建与运行）。
+DEV_PRUNE_DIR_NAMES = {"src", "test", "tests", "__tests__", "coverage", ".github", ".vscode"}
+DEV_FILE_PREFIXES = (
+    "tsconfig",
+    "tsup.config.",
+    "vitest.config.",
+    "jest.config.",
+    "vite.config.",
+    "rollup.config.",
+    "esbuild.config.",
+    ".eslintrc",
+    ".eslintignore",
+    ".prettierrc",
+    ".editorconfig",
+    ".gitignore",
+    ".npmignore",
+)
+DEV_FILE_SUFFIXES = (".map",)
+
 ZIP_PREFIX = "quartz-fullstack/"
 TIMESTAMP = datetime.now().strftime("%Y%m%d-%H%M%S")
 OUT_FILE = PROJECT_ROOT / f"quartz-deploy-{TIMESTAMP}.zip"
+
+
+def is_dev_file(name):
+    """插件目录下与构建/运行无关的开发产物（可安全剔除）。"""
+    return name.endswith(DEV_FILE_SUFFIXES) or name.startswith(DEV_FILE_PREFIXES)
+
+
+def in_community_plugin(dirpath):
+    """dirpath 是否位于 .quartz/plugins/<name>/ 之下（社区插件目录内）。"""
+    try:
+        rel = dirpath.relative_to(PLUGINS_CACHE_DIR)
+    except ValueError:
+        return False
+    return len(rel.parts) >= 1
 
 
 def local_plugin_names():
@@ -72,22 +110,32 @@ def community_plugin_dirs(local_names):
     return result
 
 
-def walk_files(root, keep_dot_git, local_names):
+def walk_files(root, keep_dot_git, local_names, slim_local=False, slim_community=False):
     """遍历 root，按规则产出文件路径。
 
-    keep_dot_git=True 时保留 .git 目录（社区插件浅克隆离线复用需要）。
-    任意层级剔除 node_modules；跳过链接型目录与「本地插件名」命名的条目。
+    keep_dot_git     : 仅保留「社区插件自身」的 .git（.quartz/plugins/<name>/.git）；
+                       排除 quartz5/.git 等其它 .git。
+    slim_local       : 对 plugins-local 全量剔除开发产物。
+    slim_community   : 仅对 .quartz/plugins/<name>/ 之下剔除开发产物（不动基座源码）。
+    任意层级剔除 node_modules 与 .github；跳过链接型目录与「本地插件名」命名的条目。
     """
     for dirpath, dirnames, filenames in os.walk(root):
+        here = Path(dirpath)
+        slim_here = slim_local or (slim_community and in_community_plugin(here))
+
         kept = []
         for dn in dirnames:
-            full = Path(dirpath) / dn
+            full = here / dn
             if dn in PRUNE_DIR_NAMES:
                 continue
-            if dn == ".git" and not keep_dot_git:
+            if slim_here and dn in DEV_PRUNE_DIR_NAMES:
                 continue
+            if dn == ".git":
+                # 只保留社区插件自身的 .git（离线复用必需）；quartz5/.git 等排除
+                if not (keep_dot_git and here.parent == PLUGINS_CACHE_DIR):
+                    continue
             # 本地插件在 .quartz/plugins 下的条目（开发机是 junction）按名跳过
-            if Path(dirpath) == PLUGINS_CACHE_DIR and dn in local_names:
+            if here == PLUGINS_CACHE_DIR and dn in local_names:
                 continue
             if full.is_symlink():  # 兜底：任何链接型目录一律跳过
                 continue
@@ -99,14 +147,20 @@ def walk_files(root, keep_dot_git, local_names):
                 continue
             if fn.endswith(PRUNE_FILE_SUFFIXES):
                 continue
-            yield Path(dirpath) / fn
+            if slim_here and is_dev_file(fn):
+                continue
+            yield here / fn
 
 
 def collect(local_names):
     files = []
-    for p in walk_files(QUARTZ5_DIR, keep_dot_git=True, local_names=local_names):
+    for p in walk_files(
+        QUARTZ5_DIR, keep_dot_git=True, local_names=local_names, slim_community=True
+    ):
         files.append((p, p.relative_to(PROJECT_ROOT)))
-    for p in walk_files(PLUGINS_LOCAL_DIR, keep_dot_git=False, local_names=local_names):
+    for p in walk_files(
+        PLUGINS_LOCAL_DIR, keep_dot_git=False, local_names=local_names, slim_local=True
+    ):
         files.append((p, p.relative_to(PROJECT_ROOT)))
     for rel in EXTRA_FILES:
         p = PROJECT_ROOT / rel
