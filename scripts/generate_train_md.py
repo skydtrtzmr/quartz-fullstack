@@ -44,11 +44,11 @@ from v5_domain_config import write_domain_config as write_v5_domain_config
 # ============ 域模型配置 ============
 
 FOLDER_CONFIGS = [
-    {"name": "设备", "prefix": "equip", "count": 120},
-    {"name": "缺陷单", "prefix": "defect", "count": 500},
-    {"name": "经验案例", "prefix": "case", "count": 200},
-    {"name": "培训课程", "prefix": "course", "count": 80},
-    {"name": "员工", "prefix": "staff", "count": 60},
+    {"name": "设备", "prefix": "equip", "count": 800},
+    {"name": "缺陷单", "prefix": "defect", "count": 2500},
+    {"name": "经验案例", "prefix": "case", "count": 400},
+    {"name": "培训课程", "prefix": "course", "count": 1000},
+    {"name": "员工", "prefix": "staff", "count": 1060},
 ]
 
 # 大区维度：6 个专业（设备/缺陷单/案例/课程/员工 全部带此字段）
@@ -66,7 +66,7 @@ EQUIP_TYPE_MAP = {
     "电气设备":   ("公用系统", "电气"),
     "仪控系统":   ("公用系统", "仪控"),
 }
-# 设备类别出现权重（合计 = 设备数）
+# 设备类别出现权重（相对比例，无需合计等于设备数）
 EQUIP_TYPE_WEIGHTS = {
     "焚烧炉": 18, "余热锅炉": 14, "汽轮机": 12, "发电机": 12,
     "烟气净化": 16, "渗滤液处理": 12, "吊车": 10, "电气设备": 14, "仪控系统": 12,
@@ -277,12 +277,8 @@ def pick_tags(folder_name: str):
 
 
 def sample_weighted(weighted: dict, k: int) -> list:
-    """按权重有放回展开后取样"""
-    items = []
-    for v, w in weighted.items():
-        items.extend([v] * w)
-    random.shuffle(items)
-    return items[:k]
+    """按权重（相对比例）有放回抽样，返回恰好 k 个元素"""
+    return random.choices(list(weighted.keys()), weights=list(weighted.values()), k=k)
 
 
 def build_fm(pairs) -> str:
@@ -319,10 +315,18 @@ def d_alias(rec) -> str:
 
 
 def generate_unique_names(count: int) -> list:
-    names = set()
-    while len(names) < count:
-        names.add(random.choice(SURNAMES) + random.choice(GIVEN_NAMES))
-    return list(names)
+    """有放回地从姓名池取名，重名者追加编号（王伟 / 王伟2 / 王伟3…）保证唯一。
+
+    姓名池组合数（|SURNAMES| × |GIVEN_NAMES|）可能小于 count，
+    故不做去重重采样（会死循环），改用计数后缀，恒可终止且结果可复现。
+    """
+    names = []
+    seen = defaultdict(int)
+    for _ in range(count):
+        base = random.choice(SURNAMES) + random.choice(GIVEN_NAMES)
+        seen[base] += 1
+        names.append(base if seen[base] == 1 else f"{base}{seen[base]}")
+    return names
 
 
 # ============ 阶段一：主体与关系分配 ============
