@@ -448,9 +448,16 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 | 键 | 作用 | 当前值 |
 |----|------|--------|
 | `graph.localDepth` | 局部图谱预计算深度；运行时判定 `usePrecomputed = depth>0 && depth<=precomputeDepth` | 1 |
+| `graph.loadBatchSize` | **「+N」溢出分批加载**（2026-10-10）：超出 `maxVisibleNodes` 首批预算的节点折叠成「+ N 个节点」占位节点（region 形态、虚线圆、标签常显），单击每批加载 N 个并补齐关联边；不占文件预算、双击不跳转；局部图谱（graphView=local）豁免 | 100 |
 | **`globalGraph.folders`** | **主体文件夹白名单**：首屏大区 = 这些文件夹；空 / 缺省 = 全部文件夹 | `[项目]` |
 | `globalGraph.expandCoresOnRegionOpen` | 展开大区时是否连带展开内部核心节点 | `false` |
 | `globalGraph.coreNodeLimit` | 核心节点数量硬上限（未配主体白名单时生效） | 50 |
+
+> **「+N」溢出分批与 context 门控（2026-10-10，graph-pro dev）**：
+> - **+N 分批**：文件夹页/维度值页/全局图谱中，超出 `maxVisibleNodes` 首批预算的文件节点不再静默丢弃，折叠为「+ N 个节点」占位节点（`overflow:` 前缀，region 形态），单击每批加载 `graph.loadBatchSize`（默认 100）并补齐两端已可见的关联边；状态条实时显示"图谱已显示 X / Y 个文件"。**已知限制**：`maxVisibleNodes` 累计预算不变（首批 500 + 分批累加，无总量上限）。
+> - **context 门控**：图谱聚合节点双击跳维度值页时，`?context=` 仅在**普通内容页**（有局部图谱的页面）发起跳转时携带；文件夹页（slug 带尾斜杠）/ 维度值页（`_dimensions/` 前缀）跳出不再携带——此前维度值页会把 `_dimensions/**` 当 context 逐跳传播（无意义且污染裁剪）。
+> - **`explorer-pro.dimensionMaxLevels`** 改 3 后（wte-train 已改，主模板已改，其余域副本需手动同步）：面板/目录树/列表嵌套到 3 级，**二级值页图谱按链第 3 级字段分区（不再平铺）**。**已知限制**：第 3 级值页（末级，已用字段=3）剩余链为空，图谱仍为命中实体平铺——本轮不处理，若要治本需放开值页图谱分组链的 `dimensionMaxLevels` 截断（`dimensionSelection.selectedRules` 的 slice）。
+> - ⚠️ 多组件插件 layout-only 条目必须带 `processing: false`，否则 pageType/emitter 双实例、生成产物写盘两遍（aggregation-page-pro 曾漏配，2026-10-10 修复；graph-pro 的 FolderGraph/GlobalGraphOverlay 条目是正确范例）。
 
 > ⚠️ **以下四项已删除**（2026-09-26）：`localGraph.aggregation`、`globalGraph.aggregation`、
 > `globalGraph.regionRules`、`globalGraph.coreNodeFilter`。替代关系：
