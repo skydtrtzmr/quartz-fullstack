@@ -395,3 +395,9 @@ for (let i = affected.indexOf("/"); i >= 0; i = affected.indexOf("/", i + 1)) {
 | `plugins-local/graph-pro/src/util/write.ts` | 同上（写局部图谱的 write 加日志） |
 | `scripts/touchAndBuild.ps1` | 复现脚本 |
 | `scripts/dumpJsStack.mjs` | 抓 JS 栈 / CPU 采样工具 |
+
+---
+
+
+20261010
+这个问题已经修复过了。

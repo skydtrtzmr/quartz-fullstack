@@ -105,6 +105,8 @@ npm run quartz -- build -d ../input/demo-region -o ../output/demo-region-sqlite 
 
 首次全量建立缓存；以后同一条命令处理新增、修改和删除，无变化直接跳过。强制重建在末尾加 `--reset`（清空指定 output 和缓存）。预览地址：`http://127.0.0.1:9766/demo-region-sqlite/`。
 
+**变更判定为两级（2026-10-10，补丁 #9）**：先比 mtime（取整到整数毫秒），mtime 不同再算 md5 复核——内容没变（mtime 被外部批量触碰）不再误报，直接 `No changes detected, skipping build` 秒回；哈希一致时新 mtime 静默回写入库。老缓存库（无 `content_hash` 列）不做迁移，**直接删除 `cache/<域>` 后重建基线即可**（旧库也会被启动时的幂等 `ALTER TABLE` 兜底，不会报错）。
+
 SQLite 只在所有插件写出成功后记录完成状态和产物清单。旧缓存、上次构建失败、输出目录变更或产物缺失会自动重建完整基线。修改 YAML 或插件后请加 `--reset`，普通内容变化无需加。
 
 ### 共享聚合规则（2026-09-22 引入；2026-09-26 配置写法简化）
@@ -359,6 +361,13 @@ npx quartz build -d docs -o ../output/rm-test --serve --port 8080 --baseDir demo
 - `quartz5/quartz/plugins/quartz-plugins.schema.json`：layout 增加 `component`；`position` 枚举补 `header` / `footer`（原枚举漏了这两个，而 YAML 里一直在用）
 
 原因：`loadComponentsFromPackage` 只在「插件恰好一个组件」时把插件名登记为组件别名，多组件插件的组件无法被布局解析 → 整个插件的组件静默丢弃。graph-pro 需要把「侧栏局部图谱」与「全局图谱宿主」放到不同位置（`right` / `header`），YAML 侧写法是同 source 两条条目 + `layout.component` + YAML 锚点复用 options。
+
+新增补丁 #9（2026-10-10）：**增量构建变更判定加内容哈希复核**（2 个文件）
+
+- `quartz5/quartz/util/graphdb.ts`：`GraphNode` 增加 `content_hash?: string`；建表 DDL 加列 + `initialize()` 末尾 `PRAGMA table_info` 探测后幂等 `ALTER TABLE`（旧库兜底）；`upsertNode` 持久化该列；`getChangedFiles()` 改两级判定（签名增加可选 `computeHash` 回调）
+- `quartz5/quartz/build.ts`：新增 `hashFile()`（md5，`readFileSync`）；`detectChangedFiles()` mtime 用 `Math.round` 取整为整数毫秒、把 md5 复核回调传给 `getChangedFiles` 并缓存检测期哈希；回写循环 `upsertNode` 带上 `content_hash` 与整数 mtime
+
+背景与语义：生产服务器上有外部程序批量触碰 `input/<域>` 的 mtime（内容不变），纯 mtime 判等导致每次构建恒定误报全部变更并走完整增量流程（domain3 实测恒定 `Detected 287 changed`）。两级判定后：mtime 相同 → 零开销跳过；mtime 不同 → md5 与库中一致 → **静默回写新 mtime、不计 changed**（避免下轮重复算哈希）；哈希不一致/无记录/读取失败 → 保守判 changed。注意：`getChangedFiles` 对**新文件（无 DB 记录）也必须调用一次 `computeHash` 预热缓存**——否则冷构建回写拿不到哈希落 null，下一轮 mtime 一被触碰就全量误报（2026-10-10 实测踩过）。老库不迁移：删 `cache/<域>` 重建基线即可。
 
 > **`--settings` 用法**
 > ```powershell
