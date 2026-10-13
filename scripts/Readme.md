@@ -30,6 +30,10 @@ python scripts/generate_train_md.py --domain wte-train --clean
 python scripts/generate_nested_md.py --domain nest-full --size full --clean
 python scripts/generate_nested_md.py --domain nest-small --size small --clean
 
+# 内嵌图表的业务主体：部分组织/人员/项目/任务正文直接嵌 ```echarts 图表，
+# 数据从该主体自身的 frontmatter 字段推导（状态/阶段/级别影响副标题与数值基线）。
+# 数量：--entity-charts N（-1 = 按 size 默认 small 4 / full 12，0 = 不生成；独立随机源，可复现）
+
 # 也可显式控制数量（-1 = 按 size 默认，0 = 不生成）
 python scripts/generate_nested_md.py --domain nest-full --size full --clean --charts 8 --attachments 12
 

@@ -52,6 +52,8 @@ SIZE_CONFIG = {
         # 附件 md 与 echarts 图表数量
         "attachments": 4,
         "charts": 3,
+        # 内嵌图表的业务主体数量（在组织/人员/项目/任务正文里直接嵌 echarts）
+        "entity_charts": 4,
     },
     "full": {
         "leaf_counts": {
@@ -70,6 +72,7 @@ SIZE_CONFIG = {
         },
         "attachments": 10,
         "charts": 6,
+        "entity_charts": 12,
     },
 }
 
@@ -291,11 +294,13 @@ def _pick_list(pool: list[str], missing_rate: float):
     return tags
 
 
-def build_frontmatter_lines(title: str, category: str, extra: dict, known_refs: dict) -> list:
+def build_frontmatter_lines(title: str, category: str, extra: dict, known_refs: dict,
+                            collect: dict | None = None) -> list:
     """生成 frontmatter 行列表。
 
     known_refs: {"组织": [name, ...], "人员": [...], "项目": [...]}
     extra: 调用方强制写入的字段（如引用关系），会覆盖随机生成的同名字段。
+    collect: 传入 dict 时，回传实际写入的字段值（供内嵌图表体现主体自身数据）。
     """
     pool = VALUE_POOLS[category]
     lines = ["---", f'title: "{title}"']
@@ -305,6 +310,8 @@ def build_frontmatter_lines(title: str, category: str, extra: dict, known_refs: 
     def add(key: str, value):
         if value is None:
             return
+        if collect is not None:
+            collect[key] = value
         if isinstance(value, list):
             if len(value) == 1:
                 lines.append(f'{key}: ["{value[0]}"]')
@@ -365,6 +372,95 @@ def build_content(title: str, body_links: list[str]) -> str:
             link_sentences.append(random.choice(templates))
         body += "\n\n" + " ".join(random.sample(link_sentences, min(len(link_sentences), 3)))
     return f"# {title}\n\n{body}\n"
+
+
+# ============ 业务主体内嵌图表 ============
+#
+# 在部分业务主体正文里直接嵌入 ```echarts 图表，数据从该主体自身的
+# frontmatter 字段推导（状态/阶段/级别体现在副标题、基线与目标值）。
+# 使用独立的 per-slug 随机源，不消耗全局随机流——关闭本功能时
+# 生成内容与旧版逐字节一致，便于回归。
+
+_STAGE_PROGRESS = {
+    # 项目
+    "立项": 15, "计划": 35, "执行": 60, "收尾": 85, "验收": 95,
+    # 人员
+    "入职": 30, "转正": 60, "晋升": 80, "轮岗": 50, "离职": 10,
+    # 组织
+    "筹备": 20, "扩张": 45, "稳定": 70, "收缩": 40, "重组": 55,
+    # 任务
+    "待办": 10, "进行": 45, "联调": 70, "测试": 85, "发布": 95,
+    # 附件/图表
+    "收集": 20, "整理": 50, "归档": 90, "样例": 25,
+}
+LEVEL_BASE = {"高": 85, "中": 60, "低": 40}
+
+
+def build_entity_chart_section(category: str, slug: str, title: str, fields: dict) -> str:
+    """按业务主体自身字段构建内嵌 echarts 图表，返回正文片段。"""
+    rng = random.Random(f"entity-chart:{slug}")
+    subtitle = " / ".join(
+        f"{k} {fields[k]}" for k in ("status", "阶段") if fields.get(k)
+    ) or "暂无状态"
+
+    if category == "人员":
+        # 能力雷达：维度值按主体随机，但"级别"抬升整体基线
+        base = LEVEL_BASE.get(fields.get("级别", ""), 55)
+        dims = ["开发", "设计", "协作", "文档", "交付"]
+        option = {
+            "title": {"text": f"{title} · 能力雷达", "subtext": subtitle, "left": "center"},
+            "tooltip": {},
+            "radar": {"indicator": [{"name": d, "max": 100} for d in dims]},
+            "series": [{"type": "radar",
+                        "data": [{"name": title,
+                                  "value": [min(100, base + rng.randint(-15, 15)) for _ in dims]}]}],
+        }
+    elif category == "项目":
+        # 投入趋势：柱=人日、线=完成事项；完成度仪表由"阶段"映射
+        months = [f"{m}月" for m in range(1, 7)]
+        progress = min(99, _STAGE_PROGRESS.get(fields.get("阶段", ""), 50) + rng.randint(-5, 5))
+        option = {
+            "title": {"text": f"{title} · 投入趋势", "subtext": subtitle, "left": "center"},
+            "tooltip": {"trigger": "axis"},
+            "xAxis": {"type": "category", "data": months},
+            "yAxis": {"type": "value"},
+            "series": [
+                {"name": "投入人日", "type": "bar",
+                 "data": [rng.randint(5, 40) for _ in months]},
+                {"name": "完成事项", "type": "line", "smooth": True,
+                 "data": [rng.randint(2, 18) for _ in months]},
+            ],
+        }
+    elif category == "组织":
+        # 团队构成饼图：按人员类型的种子分布，"级别"决定总规模
+        base = LEVEL_BASE.get(fields.get("级别", ""), 60)
+        roles = VALUE_POOLS["人员"]["type"]
+        option = {
+            "title": {"text": f"{title} · 团队构成", "subtext": subtitle, "left": "center"},
+            "tooltip": {"trigger": "item"},
+            "legend": {"orient": "vertical", "left": "left"},
+            "series": [{
+                "type": "pie", "radius": "55%",
+                "data": [{"name": role, "value": max(1, int(base * rng.uniform(0.3, 0.8)) // 10 * 10 + rng.randint(2, 9))}
+                         for role in roles],
+            }],
+        }
+    else:
+        # 任务：处理量柱状图，基线由"级别"决定、由"阶段"推进抬升
+        base = LEVEL_BASE.get(fields.get("级别", ""), 60)
+        base = min(95, base + _STAGE_PROGRESS.get(fields.get("阶段", ""), 50) // 3)
+        months = [f"{m}月" for m in range(1, 7)]
+        option = {
+            "title": {"text": f"{title} · 处理量趋势", "subtext": subtitle, "left": "center"},
+            "tooltip": {"trigger": "axis"},
+            "xAxis": {"type": "category", "data": months},
+            "yAxis": {"type": "value"},
+            "series": [{"name": "处理量", "type": "bar",
+                        "data": [max(1, base + rng.randint(-20, 20)) for _ in months]}],
+        }
+
+    block = json.dumps(option, ensure_ascii=False, indent=2)
+    return f"\n\n## 业务数据\n\n```echarts\n{block}\n```\n"
 
 
 def generate_index_md(folder_path: str, folder_name: str, rel_path: str):
@@ -473,7 +569,7 @@ def _check_unique_content_names(file_plan: list, attachment_count: int, chart_co
 
 
 def generate_domain(project_root: str, domain: str, size: str, clean: bool, seed: int,
-                    charts: int = -1, attachments: int = -1):
+                    charts: int = -1, attachments: int = -1, entity_charts: int = -1):
     random.seed(seed)
 
     target_dir = os.path.join(project_root, "input", domain)
@@ -517,7 +613,19 @@ def generate_domain(project_root: str, domain: str, size: str, clean: bool, seed
 
     chart_count = SIZE_CONFIG[size]["charts"] if charts < 0 else charts
     attachment_count = SIZE_CONFIG[size]["attachments"] if attachments < 0 else attachments
+    entity_chart_count = (SIZE_CONFIG[size]["entity_charts"] if entity_charts < 0
+                          else entity_charts)
     _check_unique_content_names(file_plan, attachment_count, chart_count)
+
+    # 选出内嵌图表的业务主体：跨分类均匀抽样；独立随机源，
+    # 不消耗全局随机流（关闭本功能时生成内容与旧版逐字节一致）
+    entity_chart_slugs: set[str] = set()
+    if entity_chart_count > 0:
+        pick_rng = random.Random(f"entity-charts:{domain}:{seed}")
+        candidates = [slug for _, _, slug in file_plan]
+        pick_rng.shuffle(candidates)
+        entity_chart_slugs = set(candidates[:entity_chart_count])
+    print(f"[plan] 内嵌图表的业务主体: {len(entity_chart_slugs)} 个")
 
     # 先生成附件与图表，这样普通文件的引用有目标可指
     if attachment_count > 0:
@@ -565,8 +673,12 @@ def generate_domain(project_root: str, domain: str, size: str, clean: bool, seed
             else:
                 body_links.append(att)
 
-        frontmatter = build_frontmatter_lines(title, category, extra, records_by_category)
+        fields: dict = {}
+        frontmatter = build_frontmatter_lines(title, category, extra, records_by_category,
+                                              collect=fields)
         body = build_content(title, body_links)
+        if slug in entity_chart_slugs:
+            body += build_entity_chart_section(category, slug, title, fields)
         filepath = os.path.join(folder_path, filename)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(frontmatter))
@@ -650,13 +762,16 @@ def main():
                         help="echarts 样例数量；-1 = 按 size 默认（small 3 / full 6），0 = 不生成")
     parser.add_argument("--attachments", type=int, default=-1,
                         help="附件 md 数量；-1 = 按 size 默认（small 4 / full 10），0 = 不生成")
+    parser.add_argument("--entity-charts", type=int, default=-1,
+                        help="内嵌图表的业务主体数量；-1 = 按 size 默认（small 4 / full 12），0 = 不生成")
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
 
     generate_domain(project_root, args.domain, args.size, args.clean, args.seed,
-                    charts=args.charts, attachments=args.attachments)
+                    charts=args.charts, attachments=args.attachments,
+                    entity_charts=args.entity_charts)
 
 
 if __name__ == "__main__":
