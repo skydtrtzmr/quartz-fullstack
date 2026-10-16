@@ -1,0 +1,86 @@
+{
+  "name": "navigation-history-pro",
+  "version": "1.0.0",
+  "description": "Business-domain back and forward navigation for Quartz 5",
+  "type": "module",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "preact": "^10.0.0"
+  },
+  "dependencies": {
+    "@quartz-community/types": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "preact": "^10.28.2",
+    "sass": "^1.97.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10.9.2"
+  },
+  "quartz": {
+    "name": "navigation-history-pro",
+    "displayName": "Navigation History Pro",
+    "description": "Back and forward within the current business domain",
+    "category": [
+      "component"
+    ],
+    "version": "1.0.0",
+    "quartzVersion": ">=5.0.0",
+    "dependencies": [],
+    "defaultEnabled": true,
+    "defaultOptions": {
+      "showLabels": false,
+      "restoreScroll": true
+    },
+    "configSchema": {
+      "type": "object",
+      "properties": {
+        "showLabels": {
+          "type": "boolean",
+          "default": false
+        },
+        "restoreScroll": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "components": {
+      "NavigationHistory": {
+        "displayName": "Navigation History",
+        "defaultPosition": "beforeBody",
+        "defaultPriority": 4
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+[
+  {
+    "stage": "nested-add",
+    "folders": {
+      "project": 3,
+      "project/nested": 2
+    },
+    "missing": 3,
+    "passed": true
+  },
+  {
+    "stage": "direct-add",
+    "folders": {
+      "project": 4,
+      "project/nested": 2
+    },
+    "missing": 4,
+    "passed": true
+  },
+  {
+    "stage": "classification-change",
+    "folders": {
+      "project": 4,
+      "project/nested": 2
+    },
+    "missing": 3,
+    "passed": true
+  },
+  {
+    "stage": "move",
+    "folders": {
+      "project": 4,
+      "project/nested": 1,
+      "people": 2
+    },
+    "missing": 3,
+    "passed": true
+  },
+  {
+    "stage": "delete",
+    "folders": {
+      "project": 3,
+      "project/nested": 1,
+      "people": 1
+    },
+    "missing": 2,
+    "passed": true
+  }
+]

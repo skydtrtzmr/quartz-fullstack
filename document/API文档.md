@@ -417,7 +417,7 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm/build?user=admin&pwd=password1
 **构建流程**：
 1. 检查业务域目录是否存在
 2. 执行构建命令：`node ./quartz/bootstrap-cli.mjs build --sqlite --settings={settingsDir}/{domain} -d {inputDir}/{domain} -o {outputDir}/{domain}`
-3. 构建日志保存到 `logs/tasks/task-{timestamp}.log`
+3. 构建日志保存到 `logs/tasks/task-{domain}-{YYYY-MM-DD_HH-mm-ss}.log`，例如 `task-xm-2026-10-13_14-32-05.log`
 
 **带 reset 模式**：
 ```bash
@@ -492,15 +492,15 @@ curl "http://127.0.0.1:8766/api/tasks?user=admin&pwd=password123"
   "tasks": [
     {
       "domain": "xm",
-      "taskId": "xm-20260512-222900",
+      "taskId": "xm-1778596140",
       "startTime": "2026-05-12T22:29:00+08:00",
       "reset": false,
       "command": "node ./quartz/bootstrap-cli.mjs build ...",
-      "logPath": "logs/tasks/task-xm-20260512-222900.log"
+      "logPath": "logs/tasks/task-xm-2026-05-12_22-29-00.log"
     },
     {
       "domain": "xm1",
-      "taskId": "xm1-20260512-223100",
+      "taskId": "xm1-1778596260",
       "startTime": "2026-05-12T22:31:00+08:00",
       "reset": true,
       "command": "...",

@@ -14,6 +14,9 @@ uv run python .\scripts\pack-project.py
 # 生成 WTE 培训知识库业务域（设备 120 / 缺陷单 500 / 经验案例 200 / 培训课程 80 / 员工 60）
 python scripts/generate_train_md.py --domain wte-train --clean
 
+# 新建恰好 20,000 个 Markdown 文件的业务域（包含 6 个 index.md）
+uv run python scripts/generate_train_md.py --domain wte-20k --total 20000
+
 注意，`generate_test_md.py` / `generate_train_md.py` 会同时按 **v5 规则**生成业务域配置
 `settings/{domain}/quartz.config.yaml`（实现见 `scripts/v5_domain_config.py`）：整棵继承
 `server/config.json` 的 `template_file`，只改写 `pageTitle` / `baseUrl` /

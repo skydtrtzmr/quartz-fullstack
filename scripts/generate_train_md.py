@@ -903,11 +903,29 @@ def main():
     parser = argparse.ArgumentParser(description="生成 WTE 培训知识库测试数据")
     parser.add_argument("--domain", type=str, required=True, help="业务域名称，如 wte-train")
     parser.add_argument("--clean", action="store_true", help="清空目标目录后重新生成")
+    parser.add_argument("--total", type=int, help="Markdown 文件总数（包含根目录及五个主体目录的 index.md）")
     args = parser.parse_args()
+
+    if args.total is not None:
+        index_count = len(FOLDER_CONFIGS) + 1
+        if args.total < index_count + len(FOLDER_CONFIGS):
+            parser.error(f"--total 至少为 {index_count + len(FOLDER_CONFIGS)}")
+        remaining = args.total - index_count
+        weight_sum = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
+        # 每类至少一个主体，其余按默认业务比例分配。
+        distributable = remaining - len(FOLDER_CONFIGS)
+        allocated = 0
+        for cfg in FOLDER_CONFIGS[:-1]:
+            cfg["count"] = 1 + distributable * cfg["count"] // weight_sum
+            allocated += cfg["count"]
+        FOLDER_CONFIGS[-1]["count"] = remaining - allocated
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     target_dir = os.path.join(project_root, "input", args.domain)
+
+    if args.total is not None and not args.clean and os.path.isdir(target_dir) and os.listdir(target_dir):
+        parser.error("--total 要求目标内容目录为空，避免旧文件影响总数；请选择新业务域")
 
     if args.clean and os.path.exists(target_dir):
         shutil.rmtree(target_dir)
@@ -971,6 +989,10 @@ def main():
 
     total = sum(cfg["count"] for cfg in FOLDER_CONFIGS)
     print(f"[summary] 共生成 {total} 个 Markdown 文件（+{len(FOLDER_CONFIGS) + 1} 个 index.md）")
+    actual = sum(1 for _, _, files in os.walk(target_dir) for name in files if name.endswith(".md"))
+    if args.total is not None and actual != args.total:
+        raise RuntimeError(f"文件总数不符合要求：{actual} != {args.total}")
+    print(f"[verified] Markdown 文件总数（含入口页）: {actual}")
     print(f"[summary] 目录: {target_dir}")
     print(f"[next] 域配置改动过必须全量重建，命令：{build_v5_command(args.domain)} --reset")
 
