@@ -1,0 +1,30 @@
+meta {
+  name: 无记录的域日志-no_logs
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_missing_domain}}/logs?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('无日志返回 no_logs', () => { expect(res.getStatus()).to.equal(200); expect(res.getBody().status).to.equal('no_logs'); });
+}
+
+docs {
+  无活动任务和日志时返回 JSON no_logs。
+}
+

@@ -1,0 +1,276 @@
+meta {
+  name: 等待构建完成
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  const b = res.getBody();
+  const waiting = ['queued', 'running'].includes(b.status);
+  test('状态属于当前任务', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(b.taskId).to.equal(bru.getVar('check_task_id'));
+    expect(b.domain).to.equal(bru.getVar('check_domain'));
+    expect(['queued', 'running', 'succeeded', 'failed', 'unknown']).to.include(b.status);
+  });
+  if (waiting) {
+    test('活动任务保留提交时间和正确的排队/启动信息', () => {
+      expect(b.enqueuedAt).to.be.a('string');
+      if (b.status === 'queued') expect(b.queuePosition).to.be.above(0);
+      if (b.status === 'running') expect(b.startTime).to.be.a('string');
+    });
+    if (req.getExecutionMode() === 'runner') {
+      const n = Number(bru.getVar('check_poll_count') || 0) + 1;
+      const max = Number((bru.getVar('check_max_polls') ?? bru.getFolderVar('check_max_polls')));
+      bru.setVar('check_poll_count', n);
+      test('轮询未超过上限', () => { expect(n).to.be.below(max); });
+      if (n < max) {
+        await new Promise(resolve => setTimeout(resolve, Number((bru.getVar('check_poll_ms') ?? bru.getFolderVar('check_poll_ms')))));
+        bru.setNextRequest('等待构建完成');
+      } else {
+        bru.setNextRequest(null);
+      }
+    }
+  } else {
+    bru.setVar('check_finished_status', b.status);
+    test('正常流程构建成功', () => {
+      expect(b.status, b.error || '查看日志定位构建失败').to.equal('succeeded');
+      expect(b.exitCode).to.equal(0);
+      expect(b.startTime).to.be.a('string');
+      expect(b.endTime).to.be.a('string');
+    });
+  }
+}
+
+docs {
+  Runner 模式自动每秒重查，默认最多 180 次；单独发送不会阻塞轮询，可手动重发。
+  正常模板构建应 succeeded。failed 是构建失败，unknown 是日志缺少可靠结果；两者都会使正常流程断言失败，继续查看下一项日志。
+  超时停止集合，不继续给出“全部通过”的假象。Examples 展示所有状态，不代表实际响应。
+}
+
+example {
+  name: queued
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "queued",
+          "queuePosition": 1,
+          "enqueuedAt": "2026-10-26T12:00:00+08:00"
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: running
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "running",
+          "enqueuedAt": "2026-10-26T12:00:00+08:00",
+          "startTime": "2026-10-26T12:00:01+08:00"
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: succeeded
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "succeeded",
+          "enqueuedAt": "2026-10-26T12:00:00+08:00",
+          "startTime": "2026-10-26T12:00:01+08:00",
+          "endTime": "2026-10-26T12:00:05+08:00",
+          "exitCode": 0
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: failed-进程非零退出
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "failed",
+          "enqueuedAt": "2026-10-26T12:00:00+08:00",
+          "startTime": "2026-10-26T12:00:01+08:00",
+          "endTime": "2026-10-26T12:00:05+08:00",
+          "exitCode": 1,
+          "error": "exit status 1"
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: failed-无法启动-无exitCode
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "failed",
+          "enqueuedAt": "2026-10-26T12:00:00+08:00",
+          "startTime": "2026-10-26T12:00:01+08:00",
+          "endTime": "2026-10-26T12:00:05+08:00",
+          "error": "可执行程序不存在"
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: unknown-无完整结果
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "unknown",
+          "error": "日志没有完整有效的结果记录，构建结果未确认"
+        }
+      '''
+    }
+  }
+}
+

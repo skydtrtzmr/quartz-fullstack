@@ -1,0 +1,57 @@
+meta {
+  name: 缺少鉴权-401
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/status
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 401', () => { expect(res.getStatus()).to.equal(401); });
+  test('鉴权错误响应', () => { expect(res.getBody().status).to.equal('Unauthorized'); });
+}
+
+docs {
+  不带 user/pwd，预期 401。
+}
+
+example {
+  name: Missing credentials
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "status": "Unauthorized",
+          "message": "Missing authorization parameters"
+        }
+      '''
+    }
+  }
+}
+

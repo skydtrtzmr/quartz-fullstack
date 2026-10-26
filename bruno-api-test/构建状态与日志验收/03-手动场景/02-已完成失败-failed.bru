@@ -1,0 +1,81 @@
+meta {
+  name: 已完成失败-failed
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  if ((bru.getVar('check_manual_case') ?? bru.getFolderVar('check_manual_case')) !== 'failure') {
+    if (req.getExecutionMode() === 'runner') { bru.runner.skipRequest(); }
+    else { throw new Error('请先按 Docs 准备场景，并将父文件夹 check_manual_case 设为 failure'); }
+  }
+}
+
+tests {
+  test('真实构建失败保留结果', () => {
+    expect(res.getStatus()).to.equal(200);
+    const b=res.getBody();expect(b.status).to.equal('failed');expect(b.taskId).to.equal(bru.getVar('check_task_id'));
+    expect(b.error).to.be.a('string').and.not.empty;expect(b.endTime).to.be.a('string');
+    if (b.exitCode !== undefined) expect(b.exitCode).not.to.equal(0);
+  });
+}
+
+docs {
+  check_manual_case=failure。只在验收新建的测试域操作：备份 quartz.config.yaml，临时写成无效 YAML。
+  用正常流程“提交测试域构建”提交新任务，等待结束后发送本请求；不要运行正常流程的成功断言。
+  完成后恢复 YAML，再次提交应能成功。HTTP 400 参数错误不属于这里的构建失败。
+}
+
+example {
+  name: failed
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "failed",
+          "enqueuedAt": "2026-10-26T12:00:00+08:00",
+          "startTime": "2026-10-26T12:00:01+08:00",
+          "endTime": "2026-10-26T12:00:05+08:00",
+          "exitCode": 1,
+          "error": "exit status 1"
+        }
+      '''
+    }
+  }
+}
+

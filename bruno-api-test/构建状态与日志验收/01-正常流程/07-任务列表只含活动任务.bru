@@ -1,0 +1,39 @@
+meta {
+  name: 任务列表只含活动任务
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{ip}}/api/tasks?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('任务列表计数与活动状态一致', () => {
+    expect(res.getStatus()).to.equal(200);
+    const b = res.getBody();
+    expect(b.count).to.equal(b.tasks.length);
+    expect(b.running + b.queued).to.equal(b.count);
+    b.tasks.forEach(t => { expect(['queued', 'running']).to.include(t.status); });
+    if (['succeeded', 'failed'].includes(bru.getVar('check_finished_status'))) {
+      expect(b.tasks.some(t => t.taskId === bru.getVar('check_task_id'))).to.equal(false);
+    }
+  });
+}
+
+docs {
+  完成任务不会混入 /api/tasks；其他业务域的活动任务允许存在。
+}
+

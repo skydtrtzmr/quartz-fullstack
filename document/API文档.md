@@ -92,7 +92,6 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
       "page_title": "demo-core",
       "base_url": "localhost/demo-core",
       "plugin_count": 55,
-      "enabled_plugins": ["../plugins-local/aggregation-pro", "github:quartz-community/created-modified-date", "..."],
       "aggregation": {
         "folder_depth": 2,
         "default": ["type", "status", "category"],
@@ -111,9 +110,9 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
 | `domain_name` | 域名（`settings/` 下的目录名） |
 | `display_name` | 显示名，取自 `configuration.pageTitle`，缺失时回落为域名 |
 | `page_title` / `base_url` | `configuration.pageTitle` / `configuration.baseUrl` 原值 |
-| `plugin_count` / `enabled_plugins` | `plugins` 段条目数 / `enabled` 条目的 `source` 列表 |
+| `plugin_count` | `plugins` 段条目数，仅供只读统计；不返回插件清单 |
 | `aggregation` | `configuration.aggregation` 视图：`folder_depth` / `min_group_size` / `default` / `folders`（域没配则为 `null`） |
-| `explorer` / `graph` | 域级业务配置回显，JSON 使用下划线字段名；缺省项返回代码默认值；graph.view_overrides 列出已有视图覆盖，只读 |
+| `explorer` / `graph` | 域级业务配置回显，JSON 使用现有下划线字段名；缺省项保留原接口默认值。只返回域级声明，不返回四视图覆盖解释 |
 | `warnings` | 结构校验告警（缺 `pageTitle`/`baseUrl`、`plugins` 缺 `source` 等） |
 
 ---
@@ -155,7 +154,6 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1?user=admin&pwd=password123" \
     "base_url": "localhost/xm1",
     "config_format": "yaml",
     "plugin_count": 55,
-    "enabled_plugins": ["..."],
     "aggregation": { "folder_depth": 1, "default": ["type", "status", "category"], "folders": { "...": ["..."] } },
     "warnings": []
   },
@@ -192,7 +190,7 @@ curl "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123"
 
 **响应**：单个 `DomainMeta`，字段与「1. 列出所有业务域」里的 `domains[]` 元素完全一致
 （`domain_name` / `display_name` / `page_title` / `base_url` / `config_format` /
-`plugin_count` / `enabled_plugins` / `aggregation` / `warnings`）。
+`plugin_count` / `aggregation` / `warnings`）。
 
 **其它情况**：
 - 域目录里既没有 `quartz.config.yaml` 也没有 v4 JSON → `404`
@@ -416,14 +414,15 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm/build?user=admin&pwd=password1
 {
   "status": "Accepted",
   "message": "Build triggered for domain: xm",
-  "command": "node build --settings=settings/xm -d input/xm -o output/xm"
+  "command": "node build --settings=settings/xm -d input/xm -o output/xm",
+  "taskId": "xm-1745067600"
 }
 ```
 
 **构建流程**：
 1. 检查业务域目录是否存在
 2. 执行构建命令：`node ./quartz/bootstrap-cli.mjs build --sqlite --settings={settingsDir}/{domain} -d {inputDir}/{domain} -o {outputDir}/{domain}`
-3. 构建日志保存到 `logs/tasks/task-{domain}-{YYYY-MM-DD_HH-mm-ss}.log`，例如 `task-xm-2026-10-13_14-32-05.log`
+3. 构建日志保存到 `logs/tasks/{taskId}.log`；taskId 仍为 `{domain}-{Unix秒}`，例如 `xm-1745067600.log`。同秒内先后两次任务的重名边界已知，暂不改造
 
 **带 reset 模式**：
 ```bash
@@ -453,7 +452,7 @@ curl "http://127.0.0.1:8766/api/domain/xm/status?user=admin&pwd=password123"
 }
 ```
 
-**响应**（空闲）：
+**响应**（没有活动任务且没有可查询日志）：
 ```json
 {
   "status": "idle",
@@ -462,6 +461,36 @@ curl "http://127.0.0.1:8766/api/domain/xm/status?user=admin&pwd=password123"
 ```
 
 ---
+
+任务状态说明（最新实现）：
+
+| status | 含义 |
+| --- | --- |
+| queued | 任务正在排队，含 queuePosition、enqueuedAt |
+| running | 正在运行，含 enqueuedAt、startTime |
+| succeeded | 最新任务日志有完整成功结果，exitCode 为 0 |
+| failed | 最新任务日志有完整失败结果，含 error；进程已启动时有 exitCode，启动前失败时省略 |
+| unknown | 有日志，但没有完整有效的结果行，不能确认结果；旧格式日志、异常中断或结果写入失败均可能出现 |
+| idle | 没有活动任务，也没有可查询日志 |
+
+没有活动任务时，服务扫描该域日志，按修改时间选择最新一份，仅解析末尾 64 KiB 中的固定结果行。最新日志不完整时返回 unknown，不回退到更早的成功任务。完成结果不另外存储，服务重启后仍可从日志查询。
+
+完成响应示例：
+
+```json
+{
+  "status": "failed",
+  "domain": "xm",
+  "taskId": "xm-1745067600",
+  "enqueuedAt": "2026-10-26T12:00:00+08:00",
+  "startTime": "2026-10-26T12:00:02+08:00",
+  "endTime": "2026-10-26T12:00:05+08:00",
+  "exitCode": 1,
+  "error": "exit status 1"
+}
+```
+
+日志以 `@@QUARTZ_TASK_RESULT@@ ` 开头的最终 JSON 行记录结果，仅此明确记录用于判断完成状态，不搜索命令输出中的“成功/失败”字样。提交时创建日志失败会返回 500，不接受任务；提交后日志 IO 故障可能导致结果未确认。
 
 ### 3. 获取构建日志
 
@@ -502,7 +531,7 @@ curl "http://127.0.0.1:8766/api/tasks?user=admin&pwd=password123"
       "startTime": "2026-05-12T22:29:00+08:00",
       "reset": false,
       "command": "node ./quartz/bootstrap-cli.mjs build ...",
-      "logPath": "logs/tasks/task-xm-2026-05-12_22-29-00.log"
+      "logPath": "logs/tasks/xm-1747060140.log"
     },
     {
       "domain": "xm1",
@@ -795,7 +824,6 @@ interface DomainMeta {
   page_title: string;        // configuration.pageTitle 原值
   base_url: string;          // configuration.baseUrl
   plugin_count: number;      // plugins 段条目数
-  enabled_plugins: string[]; // enabled 条目的 source 列表
   aggregation?: {            // configuration.aggregation 视图（域没配则为 null）
     folder_depth: number;
     default: string[];
@@ -826,7 +854,7 @@ quartz-fullstack/
 ├── server/                   # 后端服务代码
 │   ├── main.go
 │   ├── api.go
-│   ├── v5config.go           # 域配置（YAML）节点级读写
+│   ├── quartz_config.go           # 域配置（YAML）节点级读写
 │   ├── domain_config.go      # 业务域管理
 │   └── config.json           # 后端服务配置
 ```
@@ -982,3 +1010,20 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1/build?user=admin&pwd=password
 
 **文档版本**: v3.1
 **更新日期**: 2026-05-12
+
+
+### 配置接口读写约定（2026-10-26 调整）
+
+- POST/PUT 使用明确的 Go 字段类型；省略字段不修改，`false`、允许的 `0`、`[]` 正常处理。未知字段按原约定返回 warnings，并真正忽略；字段名称按已定义的 JSON 拼写匹配，U3 字段编码不参与。
+- 域配置与 folder 配置共用单域读改写锁；提交前校验配置并生成响应数据，临时文件完整写入后替换目标文件。此锁保护单个 Go 服务进程内的操作，不协调外部编辑器或多个服务进程。
+- 配置请求体上限 1 MiB，只接受一个 JSON 对象；重复字段、类型/范围错误返回 400，缺失配置的更新返回 404，建域冲突返回 409，文件读写错误返回 500。配置保存错误使用合法的 JSON `error` 响应。
+- folder 的 `fields: []` 删除本目录字段覆盖，`sort: null` 清除排序覆盖；未提交的区块不变。
+- 域 GET/保存响应移除非必需的 `graph.view_overrides`；已有 YAML 中四视图覆盖原样保留，不改变 Quartz 的合并规则。
+- 域列表遇到坏配置仍返回该域标识，并在 warnings 里说明读取错误；详情读取仍报告错误。
+- 保存 YAML 与重新构建站点仍是两个步骤，本次未重启服务或触发真实构建。
+
+
+域接口使用固定、明确的字段范围，不动态公开 YAML 的全部内容。`enabled_plugins` 不在响应结构中，也不是可写字段；域列表、详情及创建/保存返回的域信息均不返回此项。请求提交此键时按未知字段忽略并提示 warnings，不修改 YAML 中的插件配置。不增加隐藏字段的服务开关；`plugin_count` 仍保留为只读统计。
+
+
+构建状态与日志接口补充：`GET /api/domain/{domain}/logs` 的 `X-Task-Id` 与状态接口 taskId 对应，`X-Task-Status` 使用 queued/running/succeeded/failed/unknown，不再笼统返回 completed；有正文时仍返回 text/plain，无日志仍返回 JSON no_logs。排队提示保留。已有旧命名日志仍可查看，但没有固定结果行的旧日志返回 unknown。`GET /api/tasks` 继续只列排队/运行任务，不包含历史结果。未增加结果文件、数据库、超时或取消接口。

@@ -1,0 +1,172 @@
+--- before/v5config.go
+
++++ server/v5config.go
+
+@@ -279,23 +279,4 @@
+
+ }
+ 
+-// setMapValue 设置映射里的值节点；键不存在时追加到末尾。
+-//
+-// 已有节点**只改 Value**、保留原 Tag/Style：`folderDepth` 要想继续是整数，
+-// 就必须保住原来的 `!!int`。
+-func setMapValue(m *yaml.Node, key string, value *yaml.Node, nodePath string) error {
+-	if m == nil {
+-		return fmt.Errorf("缺少 %s 段", nodePath)
+-	}
+-	if v, ok := mapEntry(m, key); ok {
+-		if v.Kind != yaml.ScalarNode || value.Kind != yaml.ScalarNode {
+-			return fmt.Errorf("%s 不是标量，拒绝改写", nodePath)
+-		}
+-		v.Value = value.Value
+-		return nil
+-	}
+-	m.Content = append(m.Content, scalarNode(key), value)
+-	return nil
+-}
+-
+ // ---------- 路径 ----------
+ 
+@@ -400,10 +381,10 @@
+
+ // SetPageTitle 改写 configuration.pageTitle（键缺失则追加）
+ func (c *V5Config) SetPageTitle(title string) error {
+-	return setMapValue(c.configuration(), "pageTitle", scalarNode(title), "configuration.pageTitle")
++	return c.setConfigNode("pageTitle", scalarNode(title))
+ }
+ 
+ // SetBaseURL 改写 configuration.baseUrl；baseUrl 由服务端按 `{base_url}/{domain}` 生成，不接受客户端传入
+ func (c *V5Config) SetBaseURL(baseURL string) error {
+-	return setMapValue(c.configuration(), "baseUrl", scalarNode(baseURL), "configuration.baseUrl")
++	return c.setConfigNode("baseUrl", scalarNode(baseURL))
+ }
+ 
+@@ -463,9 +444,5 @@
+
+ 		return fmt.Errorf("folderDepth 必须 >= 1（收到 %d）", depth)
+ 	}
+-	agg, err := c.ensureAggregation()
+-	if err != nil {
+-		return err
+-	}
+-	return setMapValue(agg, "folderDepth", intNode(depth), "configuration.aggregation.folderDepth")
++	return c.setConfigNode("aggregation.folderDepth", intNode(depth))
+ }
+ 
+@@ -610,6 +587,30 @@
+
+ 		return fmt.Errorf("序列化 %s 失败: %w", path, err)
+ 	}
+-	if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
+-		return fmt.Errorf("写入 %s 失败: %w", path, err)
++	// Stage the complete document in the same directory. Failed writes leave
++	// the original untouched; readers never see an intentionally truncated file.
++	mode := os.FileMode(0644)
++	if info, err := os.Stat(path); err == nil {
++		mode = info.Mode().Perm()
++	}
++	staged, err := os.CreateTemp(filepath.Dir(path), ".quartz-config-*")
++	if err != nil {
++		return fmt.Errorf("暂存 %s 失败: %w", path, err)
++	}
++	defer os.Remove(staged.Name())
++	defer staged.Close()
++	if err = staged.Chmod(mode); err != nil {
++		return err
++	}
++	if _, err = staged.Write(buf.Bytes()); err != nil {
++		return err
++	}
++	if err = staged.Sync(); err != nil {
++		return err
++	}
++	if err = staged.Close(); err != nil {
++		return err
++	}
++	if err = os.Rename(staged.Name(), path); err != nil {
++		return fmt.Errorf("提交 %s 失败: %w", path, err)
+ 	}
+ 	return nil
+@@ -652,18 +653,22 @@
+
+ 		return nil, err
+ 	}
+-	explorer, err := cfg.BusinessView(explorerFields)
++	return cfg.DomainMeta(domain)
++}
++
++// DomainMeta is prepared and validated from the same in-memory document saved.
++func (cfg *V5Config) DomainMeta(domain string) (*DomainMeta, error) {
++	explorer, err := cfg.ExplorerView()
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	graph, err := cfg.BusinessView(graphFields)
++	graph, err := cfg.GraphView()
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	overrides, err := cfg.GraphViewOverrides()
+-	if err != nil {
+-		return nil, err
+-	}
+-	if len(overrides) > 0 {
+-		graph["view_overrides"] = overrides
++	var validation error
++	_ = readConfigInt(cfg, &validation, "aggregation.folderDepth", 1, 1)
++	_ = readConfigInt(cfg, &validation, "aggregation.minGroupSize", 2, 1)
++	if validation != nil {
++		return nil, validation
+ 	}
+ 	meta := &DomainMeta{
+@@ -689,27 +694,38 @@
+
+ // configuration.pageTitle 与 configuration.baseUrl。模板先解析成功再落盘，避免写出半成品。
+ func WriteDomainFromTemplate(templatePath, destPath, pageTitle, baseURL string, patches ...DomainPatch) error {
++	c, err := loadDomainTemplate(templatePath, pageTitle, baseURL, patches...)
++	if err != nil {
++		return err
++	}
++	if _, err = c.DomainMeta(""); err != nil {
++		return fmt.Errorf("%w: %v", ErrInvalidDomainConfig, err)
++	}
++	if err = os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
++		return err
++	}
++	return c.SaveAs(destPath)
++}
++
++func loadDomainTemplate(templatePath, pageTitle, baseURL string, patches ...DomainPatch) (*V5Config, error) {
+ 	data, err := os.ReadFile(templatePath)
+ 	if err != nil {
+-		return fmt.Errorf("读取模板失败: %w", err)
++		return nil, fmt.Errorf("读取模板失败: %w", err)
+ 	}
+ 	cfg, err := parseV5Config(data, templatePath)
+ 	if err != nil {
+-		return fmt.Errorf("模板不是合法的 v5 配置: %w", err)
++		return nil, fmt.Errorf("模板不是合法的 v5 配置: %w", err)
+ 	}
+ 	if err := cfg.SetPageTitle(pageTitle); err != nil {
+-		return err
++		return nil, err
+ 	}
+ 	if err := cfg.SetBaseURL(baseURL); err != nil {
+-		return err
++		return nil, err
+ 	}
+ 	for _, patch := range patches {
+ 		if err := cfg.ApplyDomainPatch(patch); err != nil {
+-			return err
+-		}
+-	}
+-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+-		return fmt.Errorf("创建配置目录失败: %w", err)
+-	}
+-	return cfg.SaveAs(destPath)
++			return nil, err
++		}
++	}
++	return cfg, nil
+ }
+ 

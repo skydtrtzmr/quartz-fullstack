@@ -1,0 +1,30 @@
+meta {
+  name: 无记录的域状态-idle
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_missing_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('无记录返回 idle', () => { expect(res.getStatus()).to.equal(200); expect(res.getBody().status).to.equal('idle'); });
+}
+
+docs {
+  当前 status 按任务记录查询，不先验证配置域是否存在。无任务和日志返回 idle，并非 404。
+}
+

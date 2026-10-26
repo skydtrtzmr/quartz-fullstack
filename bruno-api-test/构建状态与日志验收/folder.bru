@@ -1,0 +1,29 @@
+meta {
+  name: 构建状态与日志验收
+  seq: 20
+}
+
+auth {
+  mode: inherit
+}
+
+vars:pre-request {
+  check_domain: bruno-build-check
+  check_missing_domain: bruno-build-check-not-created
+  check_user: admin
+  check_pwd: password123
+  check_max_polls: 180
+  check_poll_ms: 1000
+  check_manual_case: off
+}
+
+docs {
+  选择现有环境，沿用 ip；用户名密码在本文件 Vars 中设置，默认沿用现有请求。
+  正常流程会创建独立的 bruno-build-check-时间 测试域，不使用环境中的 domain。
+  可以运行整个验收文件夹：01 正常流程、02 接口错误自动执行，03 手动场景默认跳过。
+  单独运行请求时，先执行正常流程的 01 创建测试域；已完成请求可反复查看。
+  正常流程最多轮询 check_max_polls 次，每次等待 check_poll_ms 毫秒；可按构建耗时调整。
+  手动场景需先按请求 Docs 准备，再将 check_manual_case 设为对应值；结束后恢复 off。
+  examples 是预期响应示意，不代表已对当前服务执行或通过。
+  不自动删除测试域；需要清理时，确认无运行/排队任务后用现有删除业务域接口。
+}

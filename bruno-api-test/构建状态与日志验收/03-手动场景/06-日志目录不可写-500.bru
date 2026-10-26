@@ -1,0 +1,71 @@
+meta {
+  name: 日志目录不可写-500
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  if ((bru.getVar('check_manual_case') ?? bru.getFolderVar('check_manual_case')) !== 'logio') {
+    if (req.getExecutionMode() === 'runner') { bru.runner.skipRequest(); }
+    else { throw new Error('请先按 Docs 准备场景，并将父文件夹 check_manual_case 设为 logio'); }
+  }
+}
+
+tests {
+  test('返回 HTTP 500', () => { expect(res.getStatus()).to.equal(500); });
+  test('不伪装为已接受', () => { expect(res.getBody().error).to.be.a('string'); expect(res.getBody().status).not.to.equal('Accepted'); });
+}
+
+docs {
+  check_manual_case=logio。仅在独立本地测试服务中阻止测试服务创建 logs/tasks 下的日志，然后发送本请求。
+  预期提交阶段返回 500，不入队、不启动构建。恢复目录访问后再测试。
+  此场景需要文件系统准备，不能由普通 HTTP 请求自行制造；不要对共享日志目录执行。
+  本集合不提供更改目录权限或删除目录的脚本。
+}
+
+example {
+  name: 日志创建失败
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}
+    method: POST
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 500
+      text: Internal Server Error
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "error": "创建任务日志失败: 文件系统错误（示意）"
+        }
+      '''
+    }
+  }
+}
+

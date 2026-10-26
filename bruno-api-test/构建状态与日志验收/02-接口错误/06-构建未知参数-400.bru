@@ -1,0 +1,31 @@
+meta {
+  name: 构建未知参数-400
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}&unexpected=1
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+  unexpected: 1
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 400', () => { expect(res.getStatus()).to.equal(400); });
+}
+
+docs {
+  构建参数白名单拒绝 unexpected 参数；在实际构建前返回 400。
+}
+

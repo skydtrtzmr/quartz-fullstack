@@ -157,7 +157,7 @@
 
 ## 6. 后端交接与生效
 
-1. Go 已校验并回显 explorer 与 graph 参数；aggregation 视图新增 min_group_size。graph.view_overrides 为只读字段，列出现有 YAML 内四视图显式覆盖；公共默认不能覆盖这些视图值。
+1. Go 已校验并回显 explorer 与 graph 参数；aggregation 视图新增 min_group_size。不再返回 graph.view_overrides；已有 YAML 内四视图显式覆盖保持原样，公共默认不能覆盖这些视图值。
 2. 新域 POST 继承模板后应用同一套域业务配置白名单，写盘前校验；非法配置不创建域目录。
 3. 保存响应要检查 warnings；未知字段目前可能 HTTP 200 但被忽略，不能把它当成保存成功。
 4. YAML 同步与站点构建是两个步骤。修改后需要全量构建 reset，现有静态站点不会自动更新。本文只记录配置，不触发构建、发布或修改服务级认证。
@@ -165,8 +165,8 @@
 
 ## 7. 核对源码
 
-- Go 请求白名单：`server/domain_business_config.go` 中 domainConfigWhitelist，以及 `server/domain_config.go` 中 folder 白名单。
-- Go YAML 读写与默认：`server/v5config.go` 中 AggregationView、ListingSort、PropertiesChain、SetPropertiesFolder。
+- Go JSON 请求解析：`server/config_request.go` 的 decodeDomainPatch / decodeFolderPatch；明确字段类型与 YAML 映射：`server/domain_business_config.go`。
+- Go YAML 读写与默认：`server/quartz_config.go` 中 AggregationView、ListingSort、PropertiesChain、SetPropertiesFolder。
 - 目录树全局注入与校验：`quartz5/quartz/plugins/loader/shared-explorer.ts`、`config-loader.ts`。
 - 目录树缺省值及显示逻辑：`plugins-local/explorer-pro/src/components/Explorer.tsx`、`components/scripts/explorer-pro.inline.ts`。
 - 聚合默认与目录继承：`plugins-local/aggregation-pro/src/compiler.ts`。

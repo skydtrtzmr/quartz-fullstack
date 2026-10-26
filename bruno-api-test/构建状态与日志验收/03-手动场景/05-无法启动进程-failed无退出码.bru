@@ -1,0 +1,80 @@
+meta {
+  name: 无法启动进程-failed无退出码
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  if ((bru.getVar('check_manual_case') ?? bru.getFolderVar('check_manual_case')) !== 'startup') {
+    if (req.getExecutionMode() === 'runner') { bru.runner.skipRequest(); }
+    else { throw new Error('请先按 Docs 准备场景，并将父文件夹 check_manual_case 设为 startup'); }
+  }
+}
+
+tests {
+  test('进程启动失败也写入失败结果', () => {
+    expect(res.getStatus()).to.equal(200);const b=res.getBody();expect(b.status).to.equal('failed');
+    expect(b.taskId).to.equal(bru.getVar('check_task_id'));expect(b).not.to.have.property('exitCode');
+    expect(b.error).to.be.a('string').and.not.empty;expect(b.endTime).to.be.a('string');
+  });
+}
+
+docs {
+  check_manual_case=startup。仅在独立本地测试服务中，将 command.interpreter 暂改为不存在的可执行文件并重启。
+  提交验收测试域构建后查询，应 failed 且没有 exitCode，因为进程没有启动。结束后恢复服务配置并重启。
+  该准备动作会影响同一服务所有构建，不能在共享服务上做；已有 Go 自动测试也覆盖此场景。
+  本请求只查询，不修改配置或启动程序。
+}
+
+example {
+  name: 无法启动
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "failed",
+          "enqueuedAt": "2026-10-26T12:00:00+08:00",
+          "startTime": "2026-10-26T12:00:01+08:00",
+          "endTime": "2026-10-26T12:00:05+08:00",
+          "error": "可执行程序不存在"
+        }
+      '''
+    }
+  }
+}
+

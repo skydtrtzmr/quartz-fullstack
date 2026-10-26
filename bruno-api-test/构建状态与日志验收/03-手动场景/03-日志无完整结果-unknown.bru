@@ -1,0 +1,72 @@
+meta {
+  name: 日志无完整结果-unknown
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  if ((bru.getVar('check_manual_case') ?? bru.getFolderVar('check_manual_case')) !== 'unknown') {
+    if (req.getExecutionMode() === 'runner') { bru.runner.skipRequest(); }
+    else { throw new Error('请先按 Docs 准备场景，并将父文件夹 check_manual_case 设为 unknown'); }
+  }
+}
+
+tests {
+  test('缺失结束记录不猜测成功', () => { expect(res.getStatus()).to.equal(200); const b=res.getBody(); expect(b.status).to.equal('unknown'); expect(b.taskId).to.equal(bru.getVar('check_task_id')); expect(b.error).to.be.a('string'); });
+}
+
+docs {
+  check_manual_case=unknown。确认测试任务已结束，备份其日志，在最新日志末尾移除固定结果行并保存。
+  即使正文含“构建成功”，也必须返回 unknown。测试后恢复日志。不要在仍运行或排队时篡改日志。
+  本请求不会自动修改服务文件。
+}
+
+example {
+  name: unknown
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "domain": "bruno-build-check-demo",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "status": "unknown",
+          "error": "日志没有完整有效的结果记录，构建结果未确认"
+        }
+      '''
+    }
+  }
+}
+

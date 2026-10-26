@@ -1,0 +1,54 @@
+meta {
+  name: 日志与状态对应同一任务
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/logs?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('日志头指向当前 taskId', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader('x-task-id')).to.equal(bru.getVar('check_task_id'));
+    expect(res.getHeader('content-type')).to.include('text/plain');
+  });
+  const s = res.getHeader('x-task-status');
+  test('日志使用实际状态而不是 completed', () => {
+    expect(['queued', 'running', 'succeeded', 'failed', 'unknown']).to.include(s);
+    const expected = bru.getVar('check_finished_status');
+    if (expected) expect(s).to.equal(expected);
+  });
+  if (['succeeded', 'failed'].includes(s)) {
+    const text = String(res.getBody());
+    const line = text.trimEnd().split(/\r?\n/).pop();
+    const prefix = '@@QUARTZ_TASK_RESULT@@ ';
+    test('结束结果为日志最后的固定记录', () => { expect(line.startsWith(prefix)).to.equal(true); });
+    if (line.startsWith(prefix)) {
+      const result = JSON.parse(line.slice(prefix.length));
+      test('日志记录与响应头一致', () => {
+        expect(result.taskId).to.equal(bru.getVar('check_task_id'));
+        expect(result.domain).to.equal(bru.getVar('check_domain'));
+        expect(result.status).to.equal(s);
+      });
+    }
+  }
+}
+
+docs {
+  正常流程在完成后检查；也可在运行中单独发送查看实时输出。应查看 Headers 中的 X-Task-Id、X-Task-Status、X-Log-File。
+}
+

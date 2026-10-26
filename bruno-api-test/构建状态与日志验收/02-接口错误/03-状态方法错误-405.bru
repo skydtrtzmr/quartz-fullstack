@@ -1,0 +1,30 @@
+meta {
+  name: 状态方法错误-405
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 405', () => { expect(res.getStatus()).to.equal(405); });
+}
+
+docs {
+  status 仅支持 GET；当前错误体的 MIME 尚未整体统一，本用例只验 HTTP 状态。
+}
+

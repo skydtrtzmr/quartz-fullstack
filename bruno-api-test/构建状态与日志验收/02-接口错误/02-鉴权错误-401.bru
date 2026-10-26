@@ -1,0 +1,31 @@
+meta {
+  name: 鉴权错误-401
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/logs?user=bruno-invalid-user&pwd=bruno-invalid-password
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: bruno-invalid-user
+  pwd: bruno-invalid-password
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 401', () => { expect(res.getStatus()).to.equal(401); });
+  test('鉴权错误响应', () => { expect(res.getBody().status).to.equal('Unauthorized'); });
+}
+
+docs {
+  故意使用无效测试账户，预期 401。
+}
+

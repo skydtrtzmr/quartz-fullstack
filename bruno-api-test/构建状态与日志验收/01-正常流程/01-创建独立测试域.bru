@@ -1,0 +1,56 @@
+meta {
+  name: 创建独立测试域
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}?user={{check_user}}&pwd={{check_pwd}}
+  body: json
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+body:json {
+  {
+    "page_title": "Bruno 构建状态验收"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  const suffix = Math.floor(Date.now() / 1000);
+  bru.setVar('check_domain', 'bruno-build-check-' + suffix);
+  bru.setVar('check_missing_domain', 'bruno-build-check-' + suffix + '-missing');
+  bru.setVar('check_task_id', '');
+  bru.setVar('check_finished_status', '');
+  bru.setVar('check_poll_count', 0);
+}
+
+tests {
+  test('创建测试域返回 201', () => { expect(res.getStatus()).to.equal(201); });
+  if (res.getStatus() === 201) {
+    const b = res.getBody();
+    test('域名正确且不暴露插件清单', () => {
+      expect(b.domain).to.equal(bru.getVar('check_domain'));
+      expect(b.domain_info).not.to.have.property('enabled_plugins');
+    });
+  } else if (req.getExecutionMode() === 'runner') {
+    bru.setNextRequest(null);
+  }
+}
+
+docs {
+  每次执行生成新的测试域名称，写入运行时变量 check_domain，后续请求自动使用。
+  不会修改环境中的 domain，也不会自动删除测试域。
+  如果返回 409，等一秒后重发；401 检查当前环境和父文件夹 Vars 的鉴权。
+}
+

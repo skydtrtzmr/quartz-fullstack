@@ -1,0 +1,66 @@
+meta {
+  name: 首次状态应为idle
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('新域没有任务记录', () => {
+    expect(res.getStatus()).to.equal(200);
+    const b = res.getBody();
+    expect(b.domain).to.equal(bru.getVar('check_domain'));
+    expect(b.status).to.equal('idle');
+  });
+}
+
+docs {
+  先创建新测试域；此请求只应在提交首次构建前执行。
+}
+
+example {
+  name: idle-无活动任务也无日志
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/status?user={{check_user}}&pwd={{check_pwd}}
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "status": "idle",
+          "domain": "bruno-build-check-demo"
+        }
+      '''
+    }
+  }
+}
+

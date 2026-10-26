@@ -1,0 +1,118 @@
+meta {
+  name: 提交测试域构建
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}&reset=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+  reset: true
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  if (!String(bru.getVar('check_domain')).startsWith('bruno-build-check-')) {
+    throw new Error('请先运行 创建独立测试域；仅允许构建本验收创建的测试域');
+  }
+}
+
+tests {
+  const b = res.getBody();
+  test('接受或排队并返回秒级 taskId', () => {
+    expect(res.getStatus()).to.equal(200);
+    expect(['Accepted', 'Queued']).to.include(b.status);
+    expect(b.taskId).to.be.a('string');
+    const prefix = bru.getVar('check_domain') + '-';
+    expect(b.taskId.startsWith(prefix)).to.equal(true);
+    expect(b.taskId.slice(prefix.length)).to.match(/^\d{10}$/);
+  });
+  if (res.getStatus() === 200 && ['Accepted', 'Queued'].includes(b.status)) {
+    bru.setVar('check_task_id', b.taskId);
+    bru.setVar('check_poll_count', 0);
+    bru.setVar('check_finished_status', '');
+  } else if (req.getExecutionMode() === 'runner') {
+    bru.setNextRequest(null);
+  }
+}
+
+docs {
+  仅对 bruno-build-check-* 测试域触发一次真实 reset 构建；只有点发送或运行集合才会执行。
+  不会在编写此集合时自动调用服务。Runner 会接着轮询，单独发送后可打开下一请求反复查看。
+}
+
+example {
+  name: Accepted-已开始
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}&reset=true
+    method: POST
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "status": "Accepted",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "message": "Build triggered for domain: bruno-build-check-demo",
+          "command": "node ..."
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: Queued-等待其他域构建
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}&reset=true
+    method: POST
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "status": "Queued",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "queuePosition": 1
+        }
+      '''
+    }
+  }
+}
+

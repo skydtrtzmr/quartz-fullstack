@@ -1,0 +1,31 @@
+meta {
+  name: 非法域名-400
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{ip}}/api/domain/bad:name/status?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 400', () => { expect(res.getStatus()).to.equal(400); });
+  test('错误为 JSON', () => { expect(res.getBody().error).to.be.a('string'); });
+}
+
+docs {
+  域名含冒号，不允许映射为单级目录；预期 400。
+}
+

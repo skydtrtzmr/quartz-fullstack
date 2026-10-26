@@ -1,0 +1,30 @@
+meta {
+  name: 构建域不存在-404
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_missing_domain}}/build?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 404', () => { expect(res.getStatus()).to.equal(404); });
+}
+
+docs {
+  check_missing_domain 不创建，预期在构建前返回 404。
+}
+

@@ -1,0 +1,30 @@
+meta {
+  name: 日志方法错误-405
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}/logs?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+tests {
+  test('返回 HTTP 405', () => { expect(res.getStatus()).to.equal(405); });
+}
+
+docs {
+  logs 仅支持 GET。
+}
+

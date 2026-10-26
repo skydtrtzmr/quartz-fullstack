@@ -1,0 +1,70 @@
+meta {
+  name: 同域仍忙-Busy
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: {{check_user}}
+  pwd: {{check_pwd}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 15000
+}
+
+script:pre-request {
+  if ((bru.getVar('check_manual_case') ?? bru.getFolderVar('check_manual_case')) !== 'busy') {
+    if (req.getExecutionMode() === 'runner') { bru.runner.skipRequest(); }
+    else { throw new Error('请先按 Docs 准备场景，并将父文件夹 check_manual_case 设为 busy'); }
+  }
+}
+
+tests {
+  test('同域拒绝重复构建', () => { expect(res.getStatus()).to.equal(200); const b=res.getBody(); expect(b.status).to.equal('Busy'); expect(b.taskId).to.equal(bru.getVar('check_task_id')); });
+}
+
+docs {
+  将 check_manual_case 设为 busy。先用正常流程的“提交测试域构建”启动任务，在仍 queued/running 时立即发送本请求。
+  任务已完成后会接受新构建，这种情况下不能断言 Busy。Busy 是 HTTP 200 业务状态，不是 HTTP 409。
+}
+
+example {
+  name: Busy-仍在运行或排队
+
+  request: {
+    url: {{ip}}/api/domain/{{check_domain}}/build?user={{check_user}}&pwd={{check_pwd}}
+    method: POST
+    mode: none
+  }
+
+  response: {
+    headers: {
+      content-type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "status": "Busy",
+          "taskId": "bruno-build-check-demo-1793000000",
+          "message": "Task already running for domain: bruno-build-check-demo"
+        }
+      '''
+    }
+  }
+}
+
