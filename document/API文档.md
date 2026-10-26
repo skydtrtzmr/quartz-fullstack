@@ -1,3 +1,5 @@
+> 当前业务配置合同以 [U3－Go Server－YAML 配置映射表](U3-GoServer-YAML配置映射表.md) 为准。Go 的业务参数只写 configuration，不定位插件；POST/PUT/GET 已支持目录树四项和图谱六项。
+
 # Quartz 后端 API 文档
 
 ## 概述
@@ -63,8 +65,8 @@ GET /api/domains?user=admin&pwd=password123
 
 | 接口 | 白名单字段 |
 |------|-----------|
-| `POST /api/domain/{domain}` | `page_title` |
-| `PUT /api/domain/{domain}` | `page_title`、`aggregation.folder_depth`、`aggregation.default`、`aggregation.folders` |
+| `POST /api/domain/{domain}` | 与 PUT 相同；继承模板后应用业务配置 |
+| `PUT /api/domain/{domain}` | `page_title`、`aggregation.{folder_depth,min_group_size,default,folders}`、`explorer` 四项、`graph` 六项；详见配置映射表 |
 
 ---
 
@@ -110,7 +112,8 @@ curl "http://127.0.0.1:8766/api/domains?user=admin&pwd=password123"
 | `display_name` | 显示名，取自 `configuration.pageTitle`，缺失时回落为域名 |
 | `page_title` / `base_url` | `configuration.pageTitle` / `configuration.baseUrl` 原值 |
 | `plugin_count` / `enabled_plugins` | `plugins` 段条目数 / `enabled` 条目的 `source` 列表 |
-| `aggregation` | `configuration.aggregation` 视图：`folder_depth` / `default` / `folders`（域没配则为 `null`） |
+| `aggregation` | `configuration.aggregation` 视图：`folder_depth` / `min_group_size` / `default` / `folders`（域没配则为 `null`） |
+| `explorer` / `graph` | 域级业务配置回显，JSON 使用下划线字段名；缺省项返回代码默认值；graph.view_overrides 列出已有视图覆盖，只读 |
 | `warnings` | 结构校验告警（缺 `pageTitle`/`baseUrl`、`plugins` 缺 `source` 等） |
 
 ---
@@ -208,6 +211,9 @@ PUT /api/domain/{domain}
 |----|------|------|
 | `page_title` | string | 写 `configuration.pageTitle` |
 | `aggregation.folder_depth` | int (>=1) | 写 `configuration.aggregation.folderDepth` |
+| `aggregation.min_group_size` | int (>=1) | 写 `configuration.aggregation.minGroupSize` |
+| `explorer` | object | hide_files / dimension_folders / dimension_max_levels / dimension_max_values；只写 configuration.explorer |
+| `graph` | object | global_folders / initial_node_limit / expand_batch_size / load_batch_size / core_min_links / core_aggregation_max_levels；只写 configuration.graph |
 | `aggregation.default` | string[] | 写 `branches.default`；传 `[]` 表示**删除该键**（= 整域不做字段聚合） |
 | `aggregation.folders` | object | 逐目录写 `branches.folders.<目录>`；值为 `[]` 表示**删除该目录的覆盖**（恢复逐层继承） |
 
@@ -306,7 +312,7 @@ curl -X DELETE "http://127.0.0.1:8766/api/domain/xm?user=admin&pwd=password123" 
 | 链段 | 配置位置 | 语义 |
 |------|----------|------|
 | `aggregation` | `configuration.aggregation.branches.folders` | 该目录的**聚合字段链** |
-| `properties` | `plugins[note-properties-pro].options.properties.branches.folders` | 该目录**正文属性面板显示**的字段链 |
+| `properties` | `configuration.properties.branches.folders` | 该目录**正文属性面板显示**的字段链 |
 
 目录级只有「配了字段」/「未配置」两态：未配置 → 逐层向上继承（最终用该链段的 `default`）。
 所以「恢复继承」= 删掉这一行 = 传 `fields: []`。
@@ -350,7 +356,7 @@ GET /api/domain/{domain}/_folder/{path...}
 PUT /api/domain/{domain}/_folder/{path...}
 ```
 
-请求体（白名单只认 `aggregation` / `properties` 两个键）：
+请求体（白名单支持 `aggregation` / `properties` / `sort`）：
 
 ```json
 {
@@ -365,8 +371,8 @@ PUT /api/domain/{domain}/_folder/{path...}
 | `fields` 非空 | 写/覆盖该目录条目；数组顺序即字段优先级 |
 | `fields: []` | 删除该条目（= 恢复继承） |
 | 区块内缺 `fields` | 400 |
-| 写 `properties` 但域里没有 note-properties-pro 插件 | 409 |
-| 该插件 `includeAll: true`（与 properties 链互斥） | 400（先改 includeAll） |
+| 域里没有 note-properties-pro 插件 | 仍可保存全局属性显示规则；是否渲染面板由插件启用状态决定 |
+| 该插件 `includeAll: true`（与 properties 链互斥） | Quartz5 构建时校验；Go 不读取插件选项 |
 
 响应 200：与「读」同形（写完后立刻回读）+ `warnings`（未知键、构建校验结果）。
 
@@ -376,7 +382,7 @@ PUT /api/domain/{domain}/_folder/{path...}
 DELETE /api/domain/{domain}/_folder/{path...}
 ```
 
-两个链段里该目录的条目都删（= 恢复继承）。
+删除聚合、全局属性显示链与排序中该目录的覆盖（恢复继承）。属性链只读写 `configuration.properties`，不兼容旧插件位置；JSON 请求格式保持不变。
 
 ### curl 示例
 
