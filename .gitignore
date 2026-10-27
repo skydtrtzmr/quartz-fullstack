@@ -17,3 +17,6 @@ output/*
 /quartz5
 /tmp-test-run
 /tmp-build-mode-test
+
+# Agent build logs, snapshots and temporary configuration backups
+/.task-builds/
