@@ -1,3 +1,23 @@
+# 同步现有业务域配置结构
+
+在项目根目录运行，使用 quartz5 已安装的 yaml 依赖，无需另装依赖：
+
+```powershell
+node scripts/sync-domain-configs.mjs --check
+node scripts/sync-domain-configs.mjs --write
+node scripts/sync-domain-configs.mjs --domain test1 --write
+```
+
+模板固定为 `quartz5/quartz.config.yaml`。默认只检查，存在差异时退出码为 1；
+`--write` 先备份到 `.task-builds/config-sync/<时间>/`，再替换配置。
+
+- 补齐缺失配置项，保留各域已有的参数值、目录规则、插件开关与插件选项；不会将模板里的目录名注入已有的 folders 规则。
+- 插件按“来源＋组件名”匹配，顺序、布局、order、processing 以及顶层 layout 跟随模板；缺失插件按模板补齐。
+- 模板外的自定义字段和插件保留；不猜测旧字段重命名，不自动迁移旧配置位置。
+- 脚本可重复运行。只更新 YAML，不自动构建站点；修改后按需要对相应业务域 reset 重建。
+
+脚本测试：`node --test scripts/sync-domain-configs.test.mjs`。
+
 # 生成大区模式业务域
 python scripts/generate_test_md.py --domain demo-region --profile region --clean
 

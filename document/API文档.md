@@ -706,17 +706,42 @@ layout:                          # 页型级布局调整
 {
   "graph": {
     "coreNodeFilter": [
-      { "type": "folder", "depth": 1, "values": ["组织"] },
-      { "type": "field", "field": "type", "values": ["项目", "组织"] }
+      {
+        "type": "folder",
+        "depth": 1,
+        "values": [
+          "组织"
+        ]
+      },
+      {
+        "type": "field",
+        "field": "type",
+        "values": [
+          "项目",
+          "组织"
+        ]
+      }
     ],
     "coreNodeLimit": 50,
     "regionRules": [
-      { "type": "field", "field": "客户" },
-      { "type": "folder", "depth": 2 }
+      {
+        "type": "field",
+        "field": "客户"
+      },
+      {
+        "type": "folder",
+        "depth": 2
+      }
     ],
     "aggregation": [
-      { "type": "folder", "depth": 1 },
-      { "type": "field", "field": "type" }
+      {
+        "type": "folder",
+        "depth": 1
+      },
+      {
+        "type": "field",
+        "field": "type"
+      }
     ]
   }
 }
@@ -778,15 +803,31 @@ layout:                          # 页型级布局调整
       "field": "date"
     },
     "aggregation": [
-      { "type": "folder", "depth": 1 },
-      { "type": "date", "field": "date", "granularity": "year" },
-      { "type": "field", "field": "type" }
+      {
+        "type": "folder",
+        "depth": 1
+      },
+      {
+        "type": "date",
+        "field": "date",
+        "granularity": "year"
+      },
+      {
+        "type": "field",
+        "field": "type"
+      }
     ]
   },
   "graph": {
     "aggregation": [
-      { "type": "folder", "depth": 1 },
-      { "type": "field", "field": "type" }
+      {
+        "type": "folder",
+        "depth": 1
+      },
+      {
+        "type": "field",
+        "field": "type"
+      }
     ]
   }
 }
@@ -1027,3 +1068,26 @@ curl -X POST "http://127.0.0.1:8766/api/domain/xm1/build?user=admin&pwd=password
 
 
 构建状态与日志接口补充：`GET /api/domain/{domain}/logs` 的 `X-Task-Id` 与状态接口 taskId 对应，`X-Task-Status` 使用 queued/running/succeeded/failed/unknown，不再笼统返回 completed；有正文时仍返回 text/plain，无日志仍返回 JSON no_logs。排队提示保留。已有旧命名日志仍可查看，但没有固定结果行的旧日志返回 unknown。`GET /api/tasks` 继续只列排队/运行任务，不包含历史结果。未增加结果文件、数据库、超时或取消接口。
+
+
+### 四类图谱的独立配置（2026-10-27）
+
+域列表、详情、POST/PUT 的 domain_info 都返回 graph.defaults、graph.local、graph.folder、graph.dimension、graph.global。
+JSON 与 YAML 分节一致，公共字段拼写仍为 initial_node_limit、expand_batch_size、load_batch_size、core_min_links；global 另有 folders、core_aggregation_max_levels。
+原平铺的 graph.initial_node_limit 等公共字段改为 graph.defaults.initial_node_limit 等，graph.global_folders 改为 graph.global.folders；不设置重复字段或兼容别名。旧平铺字段会作为未知键忽略并提示 warnings，调用端应同步改用分节结构。
+
+```json
+{
+  "graph": {
+    "defaults": {"initial_node_limit":500,"expand_batch_size":20,"load_batch_size":100,"core_min_links":0},
+    "local": {"initial_node_limit":500,"expand_batch_size":20,"load_batch_size":100,"core_min_links":0},
+    "folder": {"initial_node_limit":500,"expand_batch_size":20,"load_batch_size":100,"core_min_links":0},
+    "dimension": {"initial_node_limit":500,"expand_batch_size":20,"load_batch_size":100,"core_min_links":0},
+    "global": {"initial_node_limit":500,"expand_batch_size":20,"load_batch_size":100,"core_min_links":0,"folders":[],"core_aggregation_max_levels":2}
+  }
+}
+```
+
+修改接口允许只传某一类中的某一字段，其余配置保持原样。整数门槛：core_min_links >=0，其他数量 >=1；null、浮点数和类型错误返回 400 且不保存。
+查询返回每类的生效业务参数：视图自身声明优先，其次公共 defaults，最后内置默认。不会回填或重写 YAML 中未声明的值，不包括插件力导向、布局等技术参数。
+三份默认模板现已显式填写四类配置；因此只改 defaults 不会覆盖四类已声明的同名参数，需修改对应视图。

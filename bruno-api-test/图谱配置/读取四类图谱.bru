@@ -1,0 +1,37 @@
+meta {
+  name: 读取四类图谱
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{ip}}/api/domain/{{domain}}?user=admin&pwd=password123
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user: admin
+  pwd: password123
+}
+
+tests {
+  test("返回五个图谱配置分节", () => {
+    expect(res.getStatus()).to.equal(200);
+    const graph = res.getBody().graph;
+    ["defaults","local","folder","dimension","global"].forEach(name => {
+      expect(graph).to.have.property(name);
+      ["initial_node_limit","expand_batch_size","load_batch_size","core_min_links"].forEach(key => { expect(graph[name][key]).to.be.a("number"); });
+    });
+    expect(graph.global.folders).to.be.an("array");
+    expect(graph.global.core_aggregation_max_levels).to.be.a("number");
+  });
+}
+
+docs {
+  使用当前环境的 domain 查询或修改实际业务域；此请求不会在编写时自动发送。
+  修改示例显式填写全部五节；实际使用时只保留要修改的字段即可，未传字段不动。
+  global.folders=[] 会清空目录白名单，需按当前业务域实际需求调整。
+  视图显式值优先于 defaults；查看接口会显示每类生效的业务值。
+  改配置后需 reset=true 构建才能更新页面。
+}
