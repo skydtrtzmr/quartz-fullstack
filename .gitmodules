@@ -61,3 +61,7 @@
 	path = plugins-local/folder-page-pro
 	url = https://github.com/skydtrtzmr/quartz-community_folder-page
 	branch = dev
+[submodule "plugins-local/navigation-history-pro"]
+	path = plugins-local/navigation-history-pro
+	url = https://github.com/skydtrtzmr/quartz-community_navigation-history.git
+	branch = dev
